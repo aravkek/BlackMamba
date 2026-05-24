@@ -77,7 +77,8 @@ export async function POST(req: Request): Promise<NextResponse> {
 
     const created = await stripe.issuing.cards.create({
       cardholder: cardholderId,
-      currency: "cad",
+      // Stripe Issuing test mode only supports USD even on Canadian accounts.
+      currency: "usd",
       type: "virtual",
       status: "active",
       spending_controls: {
