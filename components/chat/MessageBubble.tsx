@@ -1,7 +1,8 @@
 "use client";
 
-import type { ChatMessage } from "./types";
+import type { ChatMessage, ToolInvocation } from "./types";
 import { ToolInvocationDisplay } from "./ToolInvocation";
+import { LiveCancelPanel } from "./LiveCancelPanel";
 
 function formatTime(ts: number): string {
   const date = new Date(ts);
@@ -11,6 +12,20 @@ function formatTime(ts: number): string {
   const h = hours % 12 || 12;
   const m = minutes.toString().padStart(2, "0");
   return `${h}:${m} ${ampm}`;
+}
+
+function isLiveCancel(
+  tc: ToolInvocation,
+): { runId: string; merchant: string } | null {
+  if (tc.name !== "cancel_subscription") return null;
+  const r = tc.result;
+  if (typeof r !== "object" || r === null) return null;
+  const rec = r as Record<string, unknown>;
+  if (rec.started !== true) return null;
+  if (typeof rec.run_id !== "string" || typeof rec.merchant !== "string") {
+    return null;
+  }
+  return { runId: rec.run_id, merchant: rec.merchant };
 }
 
 type MessageBubbleProps = {
@@ -39,14 +54,30 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {content}
       </p>
 
-      {/* Tool call trace */}
+      {/* Tool call trace + live cancel panels */}
       {toolCalls && toolCalls.length > 0 && (
         <div role="list" aria-label="Tool calls">
-          {toolCalls.map((tc, i) => (
-            <div key={`${tc.name}-${i}`} role="listitem">
-              <ToolInvocationDisplay invocation={tc} />
-            </div>
-          ))}
+          {toolCalls.map((tc, i) => {
+            const live = isLiveCancel(tc);
+            if (live) {
+              return (
+                <div
+                  key={`live-${live.runId}`}
+                  role="listitem"
+                >
+                  <LiveCancelPanel
+                    runId={live.runId}
+                    merchant={live.merchant}
+                  />
+                </div>
+              );
+            }
+            return (
+              <div key={`${tc.name}-${i}`} role="listitem">
+                <ToolInvocationDisplay invocation={tc} />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
