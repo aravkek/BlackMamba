@@ -64,6 +64,10 @@ export type DispatchInput = {
   threadId?: string;
   /** System prompt — passed per-message since Backboard does not persist it. */
   systemPrompt?: string;
+  /** Override the model for this dispatch (else uses env / default). */
+  model?: string;
+  /** Override the provider for this dispatch (else uses env / default). */
+  provider?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -210,8 +214,8 @@ export async function dispatch(input: DispatchInput): Promise<DispatchResult> {
   const ctx: ToolContext = {};
   const toolCallLog: DispatchRecord[] = [];
 
-  const provider = process.env.BACKBOARD_PROVIDER ?? DEFAULT_PROVIDER;
-  const model = process.env.BACKBOARD_MODEL ?? DEFAULT_MODEL;
+  const provider = input.provider ?? process.env.BACKBOARD_PROVIDER ?? DEFAULT_PROVIDER;
+  const model = input.model ?? process.env.BACKBOARD_MODEL ?? DEFAULT_MODEL;
 
   const initialBody: Record<string, unknown> = {
     content: input.userContent,

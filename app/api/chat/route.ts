@@ -19,7 +19,22 @@ const SYSTEM_PROMPT =
   "No emoji. One short paragraph max per turn.";
 
 type IncomingMessage = { role?: unknown; content?: unknown };
-type RequestBody = { messages?: unknown };
+type RequestBody = { messages?: unknown; model?: unknown };
+
+const MODEL_PROVIDERS: Record<string, string> = {
+  "gpt-4o-mini": "openai",
+  "gpt-4o": "openai",
+  "gpt-4.1-mini": "openai",
+  "claude-3-5-sonnet-latest": "anthropic",
+  "claude-3-5-haiku-latest": "anthropic",
+};
+
+function resolveModel(raw: unknown): { model?: string; provider?: string } {
+  if (typeof raw !== "string") return {};
+  const provider = MODEL_PROVIDERS[raw];
+  if (!provider) return {};
+  return { model: raw, provider };
+}
 
 function extractLatestUserContent(raw: unknown): string | null {
   if (!Array.isArray(raw)) return null;
@@ -80,10 +95,13 @@ export async function POST(req: Request): Promise<NextResponse> {
   const priorThreadId = getThreadId(sessionId);
 
   try {
+    const { model, provider } = resolveModel(body.model);
     const result = await dispatch({
       userContent,
       threadId: priorThreadId,
       systemPrompt: SYSTEM_PROMPT,
+      model,
+      provider,
     });
 
     if (result.threadId) {
