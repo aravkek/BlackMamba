@@ -7,7 +7,8 @@ import { augmentedSubscriptions } from "@/lib/statements/store";
 import type { Subscription } from "@/lib/data";
 import { canonicalize } from "@/lib/statements/canonicalize";
 
-const DEFAULT_BASE = "https://api.backboard.io";
+const DEFAULT_BASE = "https://app.backboard.io/api";
+const DEFAULT_PROVIDER = "openai";
 const DEFAULT_MODEL = "gpt-4o-mini";
 const AGENT_BASE_URL = process.env.AGENT_BASE_URL ?? "http://localhost:8001";
 
@@ -318,30 +319,25 @@ async function execWebSearch(
   if (!key) return { error: "web_search_unavailable" };
 
   const base = (process.env.BACKBOARD_BASE_URL ?? DEFAULT_BASE).replace(/\/+$/, "");
+  const provider = process.env.BACKBOARD_PROVIDER ?? DEFAULT_PROVIDER;
   const model = process.env.BACKBOARD_MODEL ?? DEFAULT_MODEL;
 
+  // One-shot Backboard message (no thread_id, no tools) with built-in web search.
   const payload = {
-    model,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a web search assistant. Search the web and return a concise, factual summary with relevant URLs when available.",
-      },
-      {
-        role: "user",
-        content: `Search the web and summarize relevant results for: ${args.query}`,
-      },
-    ],
-    temperature: 0.2,
-    max_tokens: 400,
+    content: `Search the web and summarize relevant results for: ${args.query}`,
+    llm_provider: provider,
+    model_name: model,
+    stream: false,
+    web_search: "Auto",
+    system_prompt:
+      "You are a web search assistant. Return a concise, factual summary with relevant URLs when available.",
   };
 
   try {
-    const res = await fetch(`${base}/v1/chat/completions`, {
+    const res = await fetch(`${base}/threads/messages`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${key}`,
+        "X-API-Key": key,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
@@ -353,8 +349,8 @@ async function execWebSearch(
       return { error: "web_search_unavailable" };
     }
 
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string | null } }> };
-    const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+    const json = (await res.json()) as { content?: string | null };
+    const text = json.content?.trim() ?? "";
     return { results: text.length > 0 ? text : "No results found." };
   } catch (err) {
     console.error("[chat/tools] web_search failure", err);
