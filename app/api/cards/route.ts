@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getOrCreateCardholder, getStripe } from "@/lib/stripe";
+import { addWalletCard } from "@/lib/wallet-state";
 
 // Avoid caching — every request mints a fresh card.
 export const dynamic = "force-dynamic";
@@ -56,6 +57,18 @@ export async function POST(req: Request): Promise<NextResponse> {
   const stripe = getStripe();
   if (!stripe) {
     // Demo-mode fallback so the frontend keeps working without a real key.
+    // Still persist to the wallet so the dashboard "My BlackMamba Cards"
+    // section populates even in mock mode.
+    addWalletCard({
+      cardId: `${MOCK_CARD.cardId}_${Date.now()}`,
+      merchant,
+      last4: MOCK_CARD.last4,
+      brand: MOCK_CARD.brand,
+      expMonth: MOCK_CARD.expMonth,
+      expYear: MOCK_CARD.expYear,
+      monthlyCapCents: Math.round(limit * 100),
+      mock: true,
+    });
     return NextResponse.json(MOCK_CARD);
   }
 
@@ -99,11 +112,33 @@ export async function POST(req: Request): Promise<NextResponse> {
       cardId: full.id,
     };
 
+    addWalletCard({
+      cardId: full.id,
+      merchant,
+      last4: full.last4,
+      brand: response.brand,
+      expMonth: full.exp_month,
+      expYear: full.exp_year,
+      monthlyCapCents: Math.round(limit * 100),
+      mock: false,
+    });
+
     return NextResponse.json(response);
   } catch (err) {
     // Log full context server-side; return generic error to client.
     console.error("[cards] stripe_failure", err);
     // Fall back to mock so the demo never visibly breaks on stage.
+    // Still persist a wallet row so the dashboard renders something.
+    addWalletCard({
+      cardId: `${MOCK_CARD.cardId}_fallback_${Date.now()}`,
+      merchant,
+      last4: MOCK_CARD.last4,
+      brand: MOCK_CARD.brand,
+      expMonth: MOCK_CARD.expMonth,
+      expYear: MOCK_CARD.expYear,
+      monthlyCapCents: Math.round(limit * 100),
+      mock: true,
+    });
     return NextResponse.json({ ...MOCK_CARD, fallback: true });
   }
 }
