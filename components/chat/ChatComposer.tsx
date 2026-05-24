@@ -9,6 +9,7 @@ import {
 } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/shadcn/button";
+import { ModelSelector } from "./ModelSelector";
 
 const MAX_ROWS = 6;
 
@@ -16,12 +17,16 @@ type ChatComposerProps = {
   onSend: (text: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  model: string;
+  onModelChange: (id: string) => void;
 };
 
 export function ChatComposer({
   onSend,
   disabled = false,
   placeholder,
+  model,
+  onModelChange,
 }: ChatComposerProps) {
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
@@ -91,7 +96,7 @@ export function ChatComposer({
             aria-label="Message input"
             className="
               w-full resize-none bg-transparent
-              text-[15px] text-[#ededed] placeholder:text-[#5a5a5f]
+              text-[15px] text-[color:var(--fg)] placeholder:text-[color:var(--fg-dim)]
               leading-relaxed outline-none border-none
               disabled:opacity-40
               overflow-y-auto no-scrollbar
@@ -101,13 +106,11 @@ export function ChatComposer({
 
         {/* Bottom action row */}
         <div className="flex items-center justify-between px-4 pb-3">
-          <span className="mono text-[10px] text-[#5a5a5f] uppercase tracking-widest select-none">
-            aria
-          </span>
+          <ModelSelector value={model} onChange={onModelChange} />
           <div className="flex items-center gap-2">
             {hasContent && (
               <span
-                className="mono text-[11px] text-[#5a5a5f] select-none"
+                className="mono text-[11px] text-[color:var(--fg-dim)] select-none"
                 aria-hidden="true"
               >
                 &#8629;

@@ -13,8 +13,11 @@ import {
 } from "@/components/chat";
 import { UploadModal } from "@/components/UploadModal";
 import { VirtualCardReveal } from "@/components/VirtualCardReveal";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/shadcn/button";
 import { SUBSCRIPTIONS, type Subscription } from "@/lib/data";
+
+const DEFAULT_MODEL = "gpt-4o-mini";
 
 type ApiChatResponse = {
   message: { role: string; content: string };
@@ -52,6 +55,7 @@ export default function HomePage() {
     useState<Subscription[]>(SUBSCRIPTIONS);
   const [cancelledIds, setCancelledIds] = useState<Set<string>>(new Set());
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [model, setModel] = useState<string>(DEFAULT_MODEL);
   const [walletCards, setWalletCards] = useState<WalletCard[]>([]);
   const [reveal, setReveal] = useState<RevealState>({
     open: false,
@@ -128,7 +132,7 @@ export default function HomePage() {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: apiMessages }),
+          body: JSON.stringify({ messages: apiMessages, model }),
         });
 
         if (!res.ok) {
@@ -219,7 +223,7 @@ export default function HomePage() {
         setPending(false);
       }
     },
-    [messages, subscriptions, refresh, fetchWallet],
+    [messages, subscriptions, refresh, fetchWallet, model],
   );
 
   const handleRailPick = useCallback(
@@ -230,13 +234,13 @@ export default function HomePage() {
   );
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#0a0a0a] text-[#ededed] overflow-hidden relative z-10">
+    <div className="flex flex-col h-screen w-full bg-[color:var(--bg)] text-[color:var(--fg)] overflow-hidden relative z-10">
       {/* Header */}
       <motion.header
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className="flex items-center justify-between px-8 py-6 border-b border-white/[0.06] shrink-0"
+        className="flex items-center justify-between px-8 py-6 border-b border-[color:var(--border-soft)] shrink-0"
       >
         <div className="flex items-center gap-3">
           <BrandMark id="tangerine" size={22} />
@@ -244,14 +248,17 @@ export default function HomePage() {
             Switchback
           </span>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setUploadOpen(true)}
-          className="border border-white/[0.08] hover:border-white/[0.15] hover:bg-white/[0.03] text-[#ededed]"
-        >
-          Upload statement
-        </Button>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setUploadOpen(true)}
+            className="border border-[color:var(--border-soft)] hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-3)] text-[color:var(--fg)]"
+          >
+            Upload statement
+          </Button>
+        </div>
       </motion.header>
 
       {/* Main body: chat column + subscription rail */}
@@ -259,18 +266,23 @@ export default function HomePage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1, ease: [0.2, 0.8, 0.2, 1] }}
-        className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[1fr_320px] overflow-hidden"
+        className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[1fr_360px] overflow-hidden"
       >
         {/* Chat column */}
         <div className="flex flex-col min-h-0 overflow-hidden">
           <div className="flex-1 min-h-0 px-8 md:px-12 pt-8 pb-2">
             <ChatThread messages={messages} pendingAssistant={pending} />
           </div>
-          <ChatComposer onSend={sendMessage} disabled={pending} />
+          <ChatComposer
+            onSend={sendMessage}
+            disabled={pending}
+            model={model}
+            onModelChange={setModel}
+          />
         </div>
 
         {/* Subscription rail + persistent wallet */}
-        <div className="overflow-y-auto no-scrollbar px-8 pt-8 pb-8 border-l border-white/[0.06] hidden md:block">
+        <div className="overflow-y-auto no-scrollbar px-6 pt-8 pb-8 border-l border-[color:var(--border-soft)] hidden md:block">
           <SubscriptionRail
             subscriptions={subscriptions}
             onPick={handleRailPick}
@@ -312,14 +324,11 @@ export default function HomePage() {
 /* ------------------------------------------------------------------ */
 
 function WalletSection({ cards }: { cards: WalletCard[] }) {
+  if (cards.length === 0) return null;
   return (
     <section className="mt-10">
       <div className="px-1">
-        <div className="eyebrow text-[#8a8a8a]">BLACKMAMBA WALLET</div>
-        <h2 className="display text-[20px] tracking-tight text-[#ededed] mt-1.5 leading-tight">
-          Cards issued, merchants locked out.
-        </h2>
-        <div className="mt-4 h-px bg-[#1f1f1f]" />
+        <div className="h-px bg-[color:var(--border-soft)]" />
       </div>
 
       <div className="mt-5 px-1">

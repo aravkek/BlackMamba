@@ -40,18 +40,18 @@ export function SubscriptionRail({
   const totalFormatted = formatTotal(annualTotal);
 
   return (
-    <aside className="w-full md:w-80 shrink-0 flex flex-col">
+    <aside className="w-full shrink-0 flex flex-col">
       {/* Eyebrow header */}
-      <div className="mono text-[10px] uppercase tracking-widest text-[#5a5a5f] mb-3">
+      <div className="mono text-[10px] uppercase tracking-widest text-[color:var(--fg-dim)] mb-3">
         Subscriptions
       </div>
 
       {/* Hairline separator */}
-      <div className="h-px bg-white/[0.06] mb-3" />
+      <div className="h-px bg-[color:var(--border-soft)] mb-3" />
 
       {/* Subscription list */}
       {subscriptions.length === 0 ? (
-        <p className="mono text-[12px] text-[#5a5a5f] text-center py-4">
+        <p className="mono text-[12px] text-[color:var(--fg-dim)] text-center py-4">
           no subscriptions yet
         </p>
       ) : (
@@ -59,8 +59,8 @@ export function SubscriptionRail({
           {subscriptions.map((sub) => {
             const isCancelled = cancelledIds?.has(sub.id) ?? false;
             const amountColor = sub.isTrialVerify
-              ? "text-[#F38B00]"
-              : "text-[#ededed]";
+              ? "text-[color:var(--tangerine)]"
+              : "text-[color:var(--fg)]";
 
             return (
               <li key={sub.id}>
@@ -73,10 +73,10 @@ export function SubscriptionRail({
                     "w-full flex items-center justify-between py-2.5 -mx-2 px-2 rounded-md text-left transition-colors duration-150",
                     isCancelled
                       ? "opacity-40 line-through cursor-default"
-                      : "hover:bg-[#161616] cursor-pointer",
+                      : "hover:bg-[color:var(--surface-3)] cursor-pointer",
                   ].join(" ")}
                 >
-                  <span className="text-[14px] text-[#ededed] flex items-center min-w-0">
+                  <span className="text-[14px] text-[color:var(--fg)] flex items-center min-w-0">
                     {sub.detectedFromStatement && (
                       <span
                         aria-hidden
@@ -102,15 +102,15 @@ export function SubscriptionRail({
       {/* Annual at-stake total */}
       {subscriptions.length > 0 && (
         <>
-          <div className="h-px bg-white/[0.06] mt-3 mb-6" />
-          <div className="mono text-[10px] uppercase tracking-widest text-[#5a5a5f]">
+          <div className="h-px bg-[color:var(--border-soft)] mt-3 mb-6" />
+          <div className="mono text-[10px] uppercase tracking-widest text-[color:var(--fg-dim)]">
             Annual at-stake
           </div>
           <div className="mt-2 flex items-baseline">
-            <span className="serif text-4xl text-[#ededed] tabular-nums leading-none">
+            <span className="serif text-4xl text-[color:var(--fg)] tabular-nums leading-none">
               {totalFormatted}
             </span>
-            <span className="mono text-[11px] text-[#5a5a5f] ml-2">/yr</span>
+            <span className="mono text-[11px] text-[color:var(--fg-dim)] ml-2">/yr</span>
           </div>
         </>
       )}
