@@ -7,6 +7,7 @@ import { AnimatedCounter } from "@/components/AnimatedCounter";
 import { BrandMark } from "@/components/BrandMark";
 import { SubscriptionCard } from "@/components/SubscriptionCard";
 import { Button } from "@/components/ui/Button";
+import { VirtualCardReveal } from "@/components/VirtualCardReveal";
 import { SUBSCRIPTIONS, YEARLY_AT_STAKE, type Subscription } from "@/lib/data";
 
 type AgentStep = {
@@ -36,6 +37,18 @@ function annualValue(sub: Subscription) {
   return sub.frequency === "monthly" ? sub.amount * 12 : sub.amount;
 }
 
+/** Monthly equivalent — used as the virtual card's monthly spend cap. */
+function monthlyValue(sub: Subscription) {
+  return sub.frequency === "monthly" ? sub.amount : sub.amount / 12;
+}
+
+type RevealRequest = {
+  /** monotonically increasing key so re-triggering re-mounts the overlay cleanly */
+  key: number;
+  merchant: string;
+  limit: number;
+};
+
 export default function HomePage() {
   const [savings, setSavings] = useState(0);
   const [cardStates, setCardStates] = useState<Record<string, CardState>>(() =>
@@ -45,6 +58,25 @@ export default function HomePage() {
   // Only one in-flight cancel at a time. Keeps the demo deterministic and
   // prevents the browser-agent backend from being slammed by concurrent runs.
   const inFlight = useRef<string | null>(null);
+
+  // The Phase 2 wow-moment: a fullscreen card-flip overlay after a successful
+  // cancellation. Null = no overlay. We use a monotonically-increasing `key`
+  // so triggering a second reveal mid-flight replaces the first one cleanly
+  // (the VirtualCardReveal component re-mounts and re-runs its issuance flow).
+  const [reveal, setReveal] = useState<RevealRequest | null>(null);
+  const revealCounter = useRef(0);
+
+  const closeReveal = useCallback(() => setReveal(null), []);
+
+  // Escape closes the overlay. Listener is cheap; only active when mounted.
+  useEffect(() => {
+    if (!reveal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeReveal();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [reveal, closeReveal]);
 
   const yearlyAtStake = useMemo(() => Math.round(YEARLY_AT_STAKE), []);
 
@@ -92,6 +124,16 @@ export default function HomePage() {
             [sub.id]: { kind: "success", result: data, expanded: false },
           }));
           setSavings((s) => s + annualValue(sub));
+
+          // Phase 2: fire the virtual-card reveal overlay. The dashboard
+          // beneath already shows the cancelled state, so when the user
+          // dismisses the overlay they see the strike-through + savings bump.
+          revealCounter.current += 1;
+          setReveal({
+            key: revealCounter.current,
+            merchant: sub.service,
+            limit: Math.max(1, Math.ceil(monthlyValue(sub))),
+          });
         } else {
           setCardStates((prev) => ({
             ...prev,
@@ -169,6 +211,19 @@ export default function HomePage() {
 
         <ConnectedFooter />
       </main>
+
+      {/* Phase 2 wow-moment: fullscreen card-flip overlay. The component owns
+          its own /api/cards fetch + auto-dismiss timer; we just supply open
+          state, merchant, monthly limit, and the close handler. The `key`
+          prop forces a clean re-mount if the user fires a second cancel
+          before dismissing the current overlay. */}
+      <VirtualCardReveal
+        key={reveal?.key ?? "closed"}
+        open={!!reveal}
+        merchant={reveal?.merchant ?? ""}
+        limit={reveal?.limit ?? 0}
+        onClose={closeReveal}
+      />
     </div>
   );
 }
