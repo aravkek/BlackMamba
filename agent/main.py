@@ -23,7 +23,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from cancel import CancelRequest, CancelResult, run_cancel_flow, run_cancel_flow_streaming
+from cancel import (
+    CancelRequest,
+    CancelResult,
+    ResubscribeRequest,
+    run_cancel_flow,
+    run_cancel_flow_streaming,
+    run_resubscribe_flow_streaming,
+)
 from jobs import JobResponse, create_job, get_job
 
 load_dotenv()
@@ -129,6 +136,37 @@ async def cancel_run_state(run_id: str) -> JobResponse:
     if job is None:
         raise HTTPException(status_code=404, detail="run_not_found")
     return job.to_response()
+
+
+class ResubscribeBody(BaseModel):
+    merchant: str = Field(..., min_length=1, max_length=64)
+    url: Optional[str] = None
+    card_number: str
+    cvc: str
+    exp_month: int
+    exp_year: int
+    cardholder_name: str = "BlackMamba User"
+    headless: bool = False
+    max_steps: int = Field(30, ge=1, le=200)
+
+
+@app.post("/resubscribe/start", response_model=StartCancelResponse)
+async def resubscribe_start(body: ResubscribeBody) -> StartCancelResponse:
+    log.info("resubscribe/start: merchant=%s", body.merchant)
+    job = create_job(merchant=body.merchant)
+    req = ResubscribeRequest(
+        merchant=body.merchant,
+        start_url=body.url,
+        card_number=body.card_number,
+        cvc=body.cvc,
+        exp_month=body.exp_month,
+        exp_year=body.exp_year,
+        cardholder_name=body.cardholder_name,
+        headless=body.headless,
+        max_steps=body.max_steps,
+    )
+    asyncio.create_task(run_resubscribe_flow_streaming(req, job))
+    return StartCancelResponse(run_id=job.run_id, merchant=job.merchant)
 
 
 @app.post("/cancel", response_model=CancelResult)

@@ -140,6 +140,51 @@ Rules:
     return base.strip()
 
 
+@dataclass
+class ResubscribeRequest:
+    merchant: str
+    start_url: Optional[str]
+    card_number: str
+    cvc: str
+    exp_month: int
+    exp_year: int
+    cardholder_name: str
+    headless: bool
+    max_steps: int
+
+
+def _resubscribe_prompt(req: "ResubscribeRequest") -> str:
+    effective_start = req.start_url or MERCHANT_HINTS.get(
+        req.merchant.lower().strip()
+    )
+    return f"""You are BlackMamba, helping the user re-subscribe to {req.merchant} with a NEW virtual card. The previous card has been replaced.
+
+GOAL: Add the new payment card to the user's {req.merchant} account and re-subscribe (or update the payment method on an existing subscription).
+
+CARD DETAILS TO USE (paste these into the payment form):
+- Card number: {req.card_number}
+- Expiry: {req.exp_month:02d}/{req.exp_year}
+- CVC: {req.cvc}
+- Name on card: {req.cardholder_name}
+
+Instructions:
+1. {"Navigate directly to " + effective_start if effective_start else f"Find the {req.merchant} account or subscribe page."}
+2. If you are not logged in, stop and report "credentials_needed".
+3. Look for "Add payment method", "Update billing", "Re-subscribe", or "Subscribe" — anything that opens a payment form.
+4. Fill the payment form using EXACTLY the card details above. If a billing address is required, use a plausible address (e.g. "123 Main St, Toronto, ON, M5V 2L9, Canada").
+5. Submit the payment form. If a "Confirm" or "Pay now" button appears, click it.
+6. Wait for a success page confirming the subscription is active or the card has been saved.
+7. Report success once you see the confirmation.
+
+Rules:
+- DO NOT enter any card information other than the ones provided above.
+- DO NOT use any card from autofill — always type the digits manually into the field.
+- If CAPTCHA or 2FA blocks you, report "human_action_required".
+- If 3D Secure / OTP is required, report "human_action_required".
+- Be efficient: aim for under 20 steps.
+""".strip()
+
+
 def _extract_step(item, fallback_index: int) -> CancelStep:
     """Build a CancelStep from one browser-use history item. Defensive against
     schema drift across browser-use minor versions."""
@@ -191,23 +236,40 @@ async def run_cancel_flow(req: CancelRequest) -> CancelResult:
     log.info("running cancel for %s via %s", req.merchant, provider)
 
     # Use the user's installed Chrome (not Playwright's bundled Chromium) so
-    # cookies/logins/2FA from prior sessions are available. Use a SEPARATE
-    # BlackMamba profile dir so we never collide with a running Chrome
-    # instance. The demoer logs into NYTimes/Spotify into this profile ONCE
-    # before the demo and the agent reuses it forever.
+    # cookies/logins from their real profile come along for the ride.
+    #
+    # IMPORTANT: browser-use ALWAYS copies a non-temp user_data_dir into a
+    # fresh temp directory per run (see browser_use/browser/profile.py
+    # `_copy_profile`). So pointing at the user's real Chrome user-data root +
+    # profile_directory='Default' means: their actual Person 1 logins get
+    # cloned into a disposable workspace per agent run. The real profile is
+    # never modified.
+    #
+    # Caveat: Chrome must not be running on that profile when the copy starts,
+    # or browser-use raises with a profile-lock error. The demoer should quit
+    # Chrome (Cmd+Q) before kicking off a cancel.
     chrome_path = os.getenv(
         "CHROME_BINARY_PATH",
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     )
-    profile_dir = os.path.expanduser(
-        os.getenv("CHROME_PROFILE_DIR", "~/.blackmamba/chrome-profile")
+    user_data_dir = os.path.expanduser(
+        os.getenv(
+            "CHROME_USER_DATA_DIR",
+            "~/Library/Application Support/Google/Chrome",
+        )
     )
-    os.makedirs(profile_dir, exist_ok=True)
-    log.info("launching chrome: binary=%s profile=%s", chrome_path, profile_dir)
+    profile_directory = os.getenv("CHROME_PROFILE_DIRECTORY", "Profile 1")
+    log.info(
+        "launching chrome: binary=%s user_data_dir=%s profile=%s",
+        chrome_path,
+        user_data_dir,
+        profile_directory,
+    )
 
     profile = BrowserProfile(
         executable_path=chrome_path,
-        user_data_dir=profile_dir,
+        user_data_dir=user_data_dir,
+        profile_directory=profile_directory,
         headless=req.headless,
         keep_alive=False,
     )
@@ -319,18 +381,25 @@ async def run_cancel_flow_streaming(req: CancelRequest, job) -> None:
     provider, llm = _pick_llm()
     log.info("[stream %s] running cancel for %s via %s", job.run_id, req.merchant, provider)
 
+    # See run_cancel_flow above for why we point at the user's real Chrome
+    # user-data root — browser-use clones it into a temp dir per run, so logins
+    # come along but the real profile is never modified.
     chrome_path = os.getenv(
         "CHROME_BINARY_PATH",
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     )
-    profile_dir = os.path.expanduser(
-        os.getenv("CHROME_PROFILE_DIR", "~/.blackmamba/chrome-profile")
+    user_data_dir = os.path.expanduser(
+        os.getenv(
+            "CHROME_USER_DATA_DIR",
+            "~/Library/Application Support/Google/Chrome",
+        )
     )
-    os.makedirs(profile_dir, exist_ok=True)
+    profile_directory = os.getenv("CHROME_PROFILE_DIRECTORY", "Profile 1")
 
     profile = BrowserProfile(
         executable_path=chrome_path,
-        user_data_dir=profile_dir,
+        user_data_dir=user_data_dir,
+        profile_directory=profile_directory,
         headless=req.headless,
         keep_alive=False,
     )
@@ -426,3 +495,138 @@ async def run_cancel_flow_streaming(req: CancelRequest, job) -> None:
         except Exception:
             pass
         log.info("[stream %s] done in %dms", job.run_id, int((time.monotonic() - start) * 1000))
+
+
+async def run_resubscribe_flow_streaming(req: ResubscribeRequest, job) -> None:
+    """Streaming resubscribe — same machinery as run_cancel_flow_streaming but
+    with a different task prompt and card details to paste."""
+    from jobs import get_lock
+
+    start = time.monotonic()
+    lock = get_lock(job.run_id)
+    job.status = "running"
+
+    try:
+        from browser_use import Agent, Browser, BrowserProfile
+    except ImportError as e:
+        job.status = "failed"
+        job.error = f"browser_use_import_failed: {e}"
+        job.finished_at = time.time()
+        return
+
+    provider, llm = _pick_llm()
+    log.info(
+        "[stream %s] resubscribe %s via %s", job.run_id, req.merchant, provider
+    )
+
+    chrome_path = os.getenv(
+        "CHROME_BINARY_PATH",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    )
+    user_data_dir = os.path.expanduser(
+        os.getenv(
+            "CHROME_USER_DATA_DIR",
+            "~/Library/Application Support/Google/Chrome",
+        )
+    )
+    profile_directory = os.getenv("CHROME_PROFILE_DIRECTORY", "Profile 1")
+
+    profile = BrowserProfile(
+        executable_path=chrome_path,
+        user_data_dir=user_data_dir,
+        profile_directory=profile_directory,
+        headless=req.headless,
+        keep_alive=False,
+    )
+    browser = Browser(browser_profile=profile)
+
+    effective_url = req.start_url or MERCHANT_HINTS.get(
+        req.merchant.lower().strip()
+    )
+    initial_actions = (
+        [{"navigate": {"url": effective_url, "new_tab": False}}]
+        if effective_url
+        else None
+    )
+
+    async def on_step_end(agent_inst) -> None:
+        if lock is None:
+            return
+        try:
+            history = getattr(agent_inst, "history", None)
+            items = (
+                getattr(history, "history", None) if history is not None else None
+            )
+            if not items:
+                return
+            latest = items[-1]
+            async with lock:
+                idx = len(job.steps)
+                step = _extract_step(latest, idx)
+                job.steps.append(step)
+                if step.url:
+                    job.final_url = step.url
+        except Exception as e:
+            log.debug("[stream %s] on_step_end parse fail: %s", job.run_id, e)
+
+    agent_kwargs = dict(
+        task=_resubscribe_prompt(req),
+        llm=llm,
+        browser=browser,
+    )
+    if initial_actions:
+        agent_kwargs["initial_actions"] = initial_actions
+
+    agent = Agent(**agent_kwargs)
+
+    try:
+        history = await agent.run(
+            max_steps=req.max_steps, on_step_end=on_step_end
+        )
+        items = getattr(history, "history", None) or list(history)
+        is_done = False
+        if items:
+            last = items[-1]
+            for r in getattr(last, "result", None) or []:
+                if getattr(r, "is_done", False):
+                    is_done = True
+                    break
+
+        terminal_error: Optional[str] = None
+        last_note = ""
+        if lock is not None:
+            async with lock:
+                last_note = (job.steps[-1].note or "").lower() if job.steps else ""
+        if "credentials_needed" in last_note:
+            terminal_error = "credentials_needed"
+            is_done = False
+        elif "human_action_required" in last_note:
+            terminal_error = "human_action_required"
+            is_done = False
+
+        if lock is not None:
+            async with lock:
+                job.status = "success" if is_done else "failed"
+                job.error = (
+                    terminal_error
+                    if terminal_error
+                    else (None if is_done else "agent_did_not_signal_done")
+                )
+                job.finished_at = time.time()
+    except Exception as e:
+        log.exception("[stream %s] resubscribe failed", job.run_id)
+        if lock is not None:
+            async with lock:
+                job.status = "failed"
+                job.error = f"agent_exception: {e}"
+                job.finished_at = time.time()
+    finally:
+        try:
+            await browser.close()
+        except Exception:
+            pass
+        log.info(
+            "[stream %s] resubscribe done in %dms",
+            job.run_id,
+            int((time.monotonic() - start) * 1000),
+        )

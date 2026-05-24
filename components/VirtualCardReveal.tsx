@@ -9,6 +9,7 @@ type CardData = {
   expMonth: number;
   expYear: number;
   brand: string;
+  cvc?: string;
 };
 
 type Props = {
@@ -60,13 +61,33 @@ export function VirtualCardReveal({ open, merchant, limit, onClose }: Props) {
         if (!res.ok) throw new Error(`status ${res.status}`);
         const json = (await res.json()) as Partial<CardData>;
         if (cancelled) return;
-        setCard({
+        const cardData: CardData = {
           cardNumber: json.cardNumber ?? MOCK_CARD.cardNumber,
           last4: json.last4 ?? MOCK_CARD.last4,
           expMonth: json.expMonth ?? MOCK_CARD.expMonth,
           expYear: json.expYear ?? MOCK_CARD.expYear,
           brand: json.brand ?? MOCK_CARD.brand,
-        });
+          cvc: json.cvc,
+        };
+        setCard(cardData);
+
+        // Kick off the browser-agent resubscribe — paste this card into the
+        // merchant's payment form. Fire-and-forget; the agent's Chrome window
+        // is the show-piece. If it fails, the wallet card is still real.
+        if (cardData.cvc) {
+          void fetch("/api/resubscribe-live", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              merchant,
+              cardNumber: cardData.cardNumber,
+              cvc: cardData.cvc,
+              expMonth: cardData.expMonth,
+              expYear: cardData.expYear,
+              headless: false,
+            }),
+          }).catch(() => {});
+        }
       } catch {
         // API not wired yet — use mock so demo never breaks
         if (cancelled) return;
