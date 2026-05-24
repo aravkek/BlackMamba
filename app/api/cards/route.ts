@@ -16,6 +16,7 @@ type CardResponse = {
   last4: string;
   expMonth: number;
   expYear: number;
+  cvc?: string;
   brand: string;
   cardId: string;
   mock?: boolean;
@@ -26,6 +27,7 @@ const MOCK_CARD: CardResponse = {
   last4: "4242",
   expMonth: 12,
   expYear: 2027,
+  cvc: "123",
   brand: "Visa",
   cardId: "ic_mock",
   mock: true,
@@ -113,11 +115,13 @@ export async function POST(req: Request): Promise<NextResponse> {
       ? raw.replace(/(.{4})/g, "$1 ").trim()
       : `**** **** **** ${full.last4}`;
 
+    const cvc = (full as Stripe.Issuing.Card & { cvc?: string }).cvc;
     const response: CardResponse = {
       cardNumber: formatted,
       last4: full.last4,
       expMonth: full.exp_month,
       expYear: full.exp_year,
+      cvc,
       brand: (full.brand ?? "Visa").replace(/^\w/, (c) => c.toUpperCase()),
       cardId: full.id,
     };

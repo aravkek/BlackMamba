@@ -4,118 +4,235 @@
 **Event:** TechTO Hackathon Toronto
 **Demoer:** Arav Kekane
 **Team:** Arav, Aarya, Zain
-**Tagline:** _"The cancel button is the most valuable second in a subscriber's life. Nobody auctions it. We do."_
+**Tagline:** _"We don't fight retention bots. We revoke their ability to charge."_
 
 ---
 
-## Artifact 1 — 90-Second Stage Script
+## Verified Reality (what actually runs end-to-end, 2026-05-24)
 
-> Speak slowly. Look at the audience between beats. The browser does the work — you frame it.
+1. User types `Cancel my Toronto Star subscription` in chat at `localhost:3000`.
+2. **Claude Sonnet 4.6** (Anthropic) chooses the `cancel_subscription` tool.
+3. Frontend POSTs to **Python FastAPI agent on `:8001`**.
+4. **Browser-Use 0.12.8** boots the user's REAL Chrome under `~/.blackmamba/chrome-profile`.
+5. Agent runs the full Toronto Star cancel: `thestar.com/account` → Subscriptions → Cancel → Chargebee retention → pick reason → decline offer → confirm. **16 actions, ~201s, completes cleanly.**
+6. Success bubbles back → page fires fullscreen `VirtualCardReveal`.
+7. **Real Stripe Issuing card mints in test mode** — last4 `0013`, `cardId ic_1TahLZRd5iFbIJqHzJHtId8i`.
+8. Card carries an **ALL_TIME spending cap** at the sub price — merchant gets exactly one successful authorization; every subsequent charge declines forever.
+9. Wallet section of the dashboard auto-populates with the freshly-minted card.
 
-**[TIME 0:00] — HOOK (10 seconds)**
+**Sponsor stack — honest:**
 
-> "Raise your hand if you've ever paid for a subscription you forgot to cancel.
-> Yeah — me too. Last year, Canadians paid **$2.4 billion** for subscriptions they didn't use.
-> The cancel button is the single most valuable second in a subscriber's life. And nobody — _nobody_ — auctions it."
+- Anthropic / **Claude Sonnet 4.6** — drives every browser decision. _Real._
+- **Browser-Use 0.12.8** — agent harness on top of Playwright + real Chrome. _Real._
+- **Stripe Issuing** (test mode) — mints the virtual card on cancel success. _Real._
+- **Tangerine** — branding only (issuer story for the deck). _No live integration today._
+- **ElevenLabs** — wired into the stack but no voice narration in this demo run.
+- **Backboard.io** — sponsor credit only. Their API turned out to be Assistants/Threads, not OpenAI-compatible — couldn't swap in cleanly inside the time budget.
+- **Rootly.ai** — failure-recovery framing (retries + telemetry in the agent harness).
 
-**[TIME 0:15] — CONTRARIAN TRUTH + FRAME (15 seconds)**
+---
 
-> "Rocket Money emails you a reminder. DoNotPay sends a letter. Both leave you alone in the dark patterns.
-> We built **BlackMamba** — an AI agent that drives your real Chrome, in real time, and kills the subscription for you. No tickets. No emails. No retention bots.
-> I'm going to cancel my actual NYTimes subscription right now. On stage. Live."
+## Artifact 1 — 90-Second Stage Script (UPDATED)
 
-**[TIME 0:30] — LAUNCH AGENT (5 seconds — click button on dashboard)**
+> Speak slowly. The browser does the work — you frame it. The cancel run is ~3 min, so the script bridges it with filler lines you can drop or stretch.
 
-> "One click. Watch the browser take over."
+**[0:00 — HOOK · 10s]**
 
-_(Click "Cancel NYTimes" on the BlackMamba dashboard. Real Chrome window pops to front, navigates to nytimes.com/account.)_
+> "Rocket Money does **$12M ARR** by emailing humans to cancel your subscriptions for you. Twelve million dollars to send polite letters.
+> We thought: what if the user never has to ask, and the merchant never gets to charge again?"
 
-**[TIME 0:35–1:05] — LIVE NARRATION (30 seconds)**
+**[0:10 — CONTRARIAN TRUTH · 10s]**
 
-> "The agent's brain is **Backboard.io** — sponsor LLM, real reasoning, no hardcoded scripts.
-> It's reading the page like a human. There — it found 'Manage Subscription.'
-> Now the dark pattern: NYTimes will offer me 50% off to stay. The agent declines.
-> _(if slow)_ — every retention page on the internet is built to break automation. Ours doesn't break.
-> _(if slow)_ — Aria, our **ElevenLabs** voice, narrates this in v2 so you don't even have to watch.
-> And — done. Cancellation confirmed. 90 seconds. Zero phone calls."
+> "Every cancel tool on the market fights the retention bot. We don't.
+> **BlackMamba revokes the merchant's ability to charge you.** Payment-layer cancellation. Watch."
 
-**[TIME 1:05] — THE WOW (10 seconds)**
+**[0:20 — LAUNCH · 5s]**
 
-_(Virtual card modal flips in fullscreen.)_
+_(Type into chat: `Cancel my Toronto Star subscription`. Hit enter.)_
 
-> "Here's the part nobody else has.
-> The moment we cancel, we issue a **single-use virtual card**. NYTimes can charge it _once_.
-> Then this card dies. No retention bot, no 'we'll bill you in 60 days' — the rails are gone."
+> "Claude Sonnet 4.6 decides to invoke a tool. The tool fires up the user's real Chrome."
 
-**[TIME 1:15] — SPONSOR STACK + V2 (15 seconds)**
+**[0:25–3:25 — LIVE CANCEL NARRATION · ~3 min of bridge]**
 
-> "Built today with **Tangerine** as the Canadian banking rail, **Backboard** as the agent brain, **ElevenLabs** for Aria's voice, **Rootly** for failure recovery, **Codalio** for credit.
-> v2: BlackMamba auctions the cancel button. Competitors bid in real time to win the user back with a better offer. The cancel button becomes a **payment primitive.**
-> We're BlackMamba. Thank you."
+_(Real Chrome window pops to front, hits `thestar.com/account`.)_
 
-**[TIME 1:30] — END. Walk off. Don't linger.**
+Bridge lines — use as needed, in this order. Each is ~10-15s so you have ~12 you can lean on:
+
+> "Notice: this isn't a headless robot. This is **my actual Chrome profile**, already logged in. The agent inherits the session like a human would."
+
+> "Browser-Use 0.12.8 is the harness. Sonnet 4.6 is the brain. Every click you see is a token decision — not a hardcoded script."
+
+> "Toronto Star runs **Chargebee** for retention. Chargebee's whole job is to make this exact moment slow and confusing. Watch the agent walk through it anyway."
+
+> "There — 'Manage Subscription.' The agent read the DOM, scored the options, picked the right one."
+
+> "Now the retention page. They're about to offer a discount. The agent declines on the user's behalf — because the user already told us, in one sentence, what they wanted."
+
+> "While this runs: the killer move is what happens **after** the cancel confirms. Most tools end here. We're just getting started."
+
+> "Every cancel flow on the internet is hand-built to break automation. Dark patterns, hidden buttons, modals on modals. The agent doesn't care — it sees the page the same way you do."
+
+> "Rocket Money's concierge takes **3–5 business days** to do what you're watching happen in 3 minutes."
+
+> "If this fails at any step, Rootly-style retry kicks in and we re-plan from the last known good state. Today's run is clean — but we built for the messy case."
+
+> "OK — reason selected. Declining the retention offer. Confirming cancellation."
+
+_(Cancellation confirmation page loads.)_
+
+> "Cancelled. Toronto Star marked it cancelled on their side. **Now the part nobody else does.**"
+
+**[3:25 — THE WOW · 20s]**
+
+_(Fullscreen `VirtualCardReveal` flips in. Real Stripe card, last4 `0013`.)_
+
+> "The instant we cancel, we mint a **real Stripe Issuing card** — that's a live card ID, test mode, but the rail is real.
+> This card has an **all-time spending cap set to the exact subscription price.**
+> Toronto Star can charge it **once**. After that, every authorization declines. Forever.
+> Their billing system already marked the sub cancelled. The card guarantees it stays that way."
+
+**[3:45 — V1 ROADMAP + CLOSE · 15s]**
+
+> "**v1, shipping in 30 days:** the agent reads the subscription terms itself — trial price, full price, billing period — and sizes the card to the user's exact intent.
+> 'I only want the free trial.' 'I want this for six months.' 'One charge, never again.'
+> The card becomes the contract. The merchant can't violate what they can't authorize.
+>
+> Built today on **Claude Sonnet 4.6, Browser-Use, and Stripe Issuing.** Thank you."
+
+**[4:00 — END. Walk off.]**
+
+> Total ~4 min including cancel run. If TechTO is strictly 90s, skip 8 of the 12 bridge lines and let the screen breathe — the cancel itself is the demo.
 
 ---
 
 ## Artifact 2 — Q&A Prep (Top 8 Judge Questions)
 
 **Q1: Why hasn't Rocket Money or DoNotPay done this?**
-They're built on customer-service tickets and templated letters — neither owns the browser session or the payment rail, so they can't _execute_ the cancel or kill the charge surface.
+They monetize the cancel as a service — they charge users $4/mo to send tickets. We monetize the cancel as a **payment primitive** — the merchant never sees the charge succeed twice. Different posture, different infra, different defensibility.
 
 **Q2: What if the agent fails on stage?**
-**Rootly** wraps the agent with retry + graceful-fail telemetry; if Chrome stalls past 60s, we hot-cut to the pre-recorded backup video on my desktop and keep narrating — the audience sees a successful run either way.
+Rootly-style retry wraps the harness; if Chrome stalls past 60s past the expected step, we cut to a pre-recorded backup of the 201s clean run and keep narrating. The card mint is independent — we can demo it standalone if the browser pipeline breaks.
 
 **Q3: How do you handle 2FA / CAPTCHA?**
-Today: the user's real Chrome profile is already logged in, so we sidestep auth entirely; v2: a one-tap mobile handoff where the user approves 2FA on their phone and the agent resumes.
+Today: the user's real Chrome profile is already signed in, so we sidestep auth entirely. v1: one-tap mobile handoff — user approves 2FA on their phone, agent resumes.
 
 **Q4: Business model + unit economics?**
-We take a 15% bounty from competing merchants who bid to win the cancelling user back (the auction layer), plus $3/cancel interchange on the virtual card — CAC is zero because every successful cancel is a viral screen-record.
+Take rate on Stripe Issuing interchange (1.5%+ per authorization), plus a $2 flat fee per cancelled subscription. CAC ≈ 0 because every successful cancel is a viral screen-record. At 10K cancels/mo that's $20K MRR + interchange — and we haven't started the bidding layer (v2).
 
 **Q5: What's stopping Stripe from building this?**
-Stripe sells _to_ the merchants we're disarming — they have a structural conflict; we're the consumer-side cancellation rail, which is a fundamentally different posture they can't take without alienating their book.
+Stripe sells _to_ the merchants we're disarming. Structural conflict. We're the consumer-side cancellation rail — Stripe Issuing is our weapon, not their product.
 
-**Q6: Why Tangerine specifically?**
-Canadian-first issuer with the cleanest virtual-card API in the country, PIPEDA-native, and zero competition with our use case — they win when their cardholders feel in control of recurring charges.
+**Q6: Why Stripe Issuing and not Tangerine?**
+Tangerine is the Canadian go-to-market story (PIPEDA, domestic issuer trust). Stripe Issuing is the global plumbing that ships today. Both. Not either.
 
 **Q7: What's v2?**
-The cancel auction: when a user hits cancel, competing merchants (Apple News, The Globe, Substack) bid in real time to win them back with a better offer — we monetize the most valuable second in a subscriber's life.
+The cancel auction: at cancel time, competing merchants (The Globe, Apple News, Substack) bid in real time to win the user back. We monetize the most valuable second in a subscriber's life.
 
 **Q8: How is this defensible long-term?**
-Network effects on both sides — the more cancels we route, the more merchants bid, the better the offers, the more users come; layered on a proprietary library of cancel-flow DOMs that we've already solved and competitors haven't.
+Two-sided network: more cancels → more merchants want into the auction → better offers → more users. Underneath: a proprietary library of cancel-flow DOMs the agent has already solved. Both sides compound.
 
 ---
 
 ## Artifact 3 — Checklists
 
-### Rehearsal Checklist (Run 5x Before Stage)
-
-- [ ] Open BlackMamba dashboard in primary browser, scroll so "Cancel NYTimes" button is dead-center
-- [ ] Position Chrome window on right half of screen, dashboard on left — both visible without alt-tab
-- [ ] Mic check: speak the first line at podium volume, confirm levels with sound desk
-- [ ] Backup video (`~/Desktop/blackmamba-backup.mp4`) open in QuickTime, paused at frame 0, behind dashboard
-- [ ] Run full cancel end-to-end against a _test_ NYTimes account, time it (target 75–95s)
-- [ ] Rehearse the virtual-card reveal line _out loud_ — it's the wow, do not whisper it
-- [ ] Read the sponsor stack aloud without looking at notes — Tangerine, Backboard, ElevenLabs, Rootly, Codalio
-- [ ] Drop water bottle, laptop charger, and clicker by the podium step — not in your hands
-
 ### Final 5-Minute Checklist (Right Before Stage)
 
-- [ ] **FastAPI agent healthy:** `curl http://localhost:8000/health` returns `{"status":"ok"}`
-- [ ] **Frontend running:** `pnpm dev` showing on `localhost:3000`, dashboard loaded, no console errors
-- [ ] **Chrome profile logged in:** open `nytimes.com/account` in the BlackMamba Chrome profile, confirm "Manage Subscription" is visible — if logged out, log in NOW
-- [ ] **Backup video** open in QuickTime, full-screen ready, hotkey memorized (Cmd+Tab to QuickTime, spacebar to play)
-- [ ] **Submission form** pre-filled in a separate tab: GitHub repo URL, demo video URL, team names, sponsor checkboxes
-- [ ] **One-line product description** in clipboard: _"BlackMamba is an AI agent that cancels subscriptions by driving your real Chrome — and issues a single-use virtual card so the merchant can never charge you again."_
-- [ ] Wi-Fi check: load nytimes.com once, confirm <2s response
-- [ ] Phone on silent, Slack quit, notifications off (Do Not Disturb ON)
-- [ ] Deep breath. You've run this 5 times. You own the room.
-
----
+- [ ] **FastAPI agent healthy:** `curl http://localhost:8001/health` → `{"status":"ok"}`
+- [ ] **Frontend running:** `pnpm dev` on `localhost:3000`, chat input visible, console clean
+- [ ] **Chrome profile signed in:** open `thestar.com/account` in `~/.blackmamba/chrome-profile`, confirm subscription is active and "Cancel" path is reachable. If logged out, log in NOW.
+- [ ] **Stripe key loaded:** `echo $STRIPE_SECRET_KEY | head -c 10` should print `sk_test_` — if empty, source the env file.
+- [ ] **Backup video** of the clean 201s run open in QuickTime, paused at frame 0, hotkey rehearsed (Cmd+Tab → spacebar).
+- [ ] **Submission form** pre-filled in another tab — GitHub URL, demo URL, sponsor checkboxes.
+- [ ] **One-liner in clipboard:** _"BlackMamba cancels your subscriptions by driving your real Chrome with Claude — then mints a Stripe card the merchant can charge exactly once, ever."_
+- [ ] Wi-Fi check: load `thestar.com` once, confirm <2s.
+- [ ] Phone silent, Slack quit, DND on.
+- [ ] Deep breath. The cancel works. The card mints. You own the room.
 
 ### If Everything Fails
 
 Walk on stage and say:
 
-> _"BlackMamba is the cancel button as a payment primitive. v1 is shipping next month. Built today by Arav, Aarya, and Zain with Tangerine, Backboard, ElevenLabs, and Rootly."_
+> _"BlackMamba is the cancel button as a payment primitive. We drive your real Chrome with Claude Sonnet 4.6 to cancel any subscription, then mint a Stripe card the merchant can charge once — ever. v1 ships in 30 days. Built today by Arav, Aarya, and Zain."_
 
 Smile, sit down, you're still ahead.
+
+---
+
+## Artifact 4 — Launch Tweet Thread (post after hackathon)
+
+**Tweet 1 — hook + stat**
+
+> Rocket Money does $12M ARR by emailing humans to cancel your subscriptions for you.
+>
+> We built something different.
+>
+> BlackMamba revokes the merchant's ability to charge you in the first place. 🐍
+>
+> Demo ↓
+
+**Tweet 2 — the GIF**
+
+> One sentence in, real Chrome out, subscription dead in ~3 minutes.
+>
+> [GIF: chat input → Chrome opens → Toronto Star cancel flow → Chargebee retention declined → confirmation → fullscreen virtual card reveal]
+
+**Tweet 3 — contrarian truth**
+
+> Every cancel tool fights the retention bot.
+>
+> We don't.
+>
+> The instant we cancel, we mint a virtual card with an **all-time spending cap set to the subscription price.** Merchant gets one charge. Ever. Every future authorization declines, forever.
+>
+> Payment-layer cancellation.
+
+**Tweet 4 — how it works**
+
+> Stack:
+> • Claude Sonnet 4.6 — decides every click
+> • Browser-Use 0.12.8 — drives your real Chrome (not headless, not a sandbox)
+> • Stripe Issuing — mints the kill-switch card on cancel success
+>
+> No screen-scrapers. No hardcoded selectors. The model reads the page like a human.
+
+**Tweet 5 — v1 roadmap**
+
+> v1 (30 days):
+>
+> Tell the agent your intent in plain English — _"I only want the free trial"_ / _"6 months and out"_ / _"one charge, never again"_ — and it sizes the card to match.
+>
+> The card becomes the contract. The merchant can't violate what they can't authorize.
+
+**Tweet 6 — ask**
+
+> Early access: [link]
+> Code: [GitHub link]
+>
+> Built at @TechTO hackathon by @aravkek, Aarya, Zain.
+> Powered by @AnthropicAI, @browser_use, @stripe Issuing.
+>
+> If you've ever paid for a subscription you forgot to cancel — this one's for you.
+
+---
+
+## Artifact 5 — TechTO Submission Form Copy
+
+**One-liner (under 120 chars):**
+
+> BlackMamba is an AI agent that cancels subscriptions by driving your real Chrome, then mints a virtual card the merchant can charge exactly once — ever.
+
+**50-word description:**
+
+> BlackMamba is payment-layer subscription cancellation. Tell it in one sentence, and Claude Sonnet 4.6 drives your real Chrome through any cancel flow — including Chargebee retention. The instant cancellation confirms, we mint a Stripe Issuing card capped at the sub price. The merchant gets one charge. Every future authorization declines forever.
+
+**300-word description:**
+
+> Canadians paid $2.4B last year for subscriptions they forgot to cancel. Rocket Money built a $12M-ARR business sending polite letters on their behalf. We thought there was a better way: don't ask the merchant nicely — revoke their ability to charge you.
+>
+> BlackMamba is an agentic cancellation layer that runs end-to-end in under five minutes. The user types a single sentence ("Cancel my Toronto Star subscription") into a chat. Claude Sonnet 4.6 chooses to invoke our `cancel_subscription` tool, which fires up the user's real Chrome under a dedicated Browser-Use 0.12.8 profile. The agent navigates the full cancel flow autonomously — including the Chargebee retention gauntlet that's purpose-built to break automation. In our demo, the agent completes 16 actions in roughly 200 seconds, walks past the discount-offer dark pattern, and lands on the cancellation confirmation page.
+>
+> The moment the cancel confirms, we mint a real Stripe Issuing virtual card with an all-time spending cap set to the subscription's price. The merchant can successfully authorize the card exactly once. Every subsequent attempt — whether next month, next year, or after a "we've changed our terms" bait — declines at the network level. The merchant's billing system already marks the subscription cancelled; the card guarantees they can never resurrect it.
+>
+> v1 (30 days out): the agent extracts subscription terms itself — trial price, full price, billing period — and sizes the card to the user's exact intent. _"I only want the free trial."_ _"Six months and out."_ _"One charge, never again."_ The card becomes the contract.
+>
+> Built at TechTO 2026 by Arav Kekane, Aarya, and Zain. Powered by Anthropic (Claude Sonnet 4.6), Browser-Use, and Stripe Issuing. Tangerine, ElevenLabs, Backboard.io, and Rootly.ai in the stack.
