@@ -55,7 +55,24 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
   const [phase, setPhase] = useState<UploadPhase>("staging");
   const [results, setResults] = useState<FileResult[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [progress, setProgress] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Simulated progress while uploading — climbs toward ~92% with an asymptotic
+  // curve so the bar always feels alive even when the server is slow. The
+  // initial bump is set when handleUpload flips the phase, so this effect only
+  // owns the interval lifecycle.
+  useEffect(() => {
+    if (phase !== "uploading") return;
+    const id = window.setInterval(() => {
+      setProgress((p) => {
+        if (p >= 92) return p;
+        const step = Math.max(0.5, (92 - p) * 0.06);
+        return Math.min(92, p + step);
+      });
+    }, 180);
+    return () => window.clearInterval(id);
+  }, [phase]);
 
   // ESC to close
   useEffect(() => {
@@ -117,6 +134,7 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
 
   const handleUpload = useCallback(async () => {
     if (files.length === 0 || phase !== "staging") return;
+    setProgress(8);
     setPhase("uploading");
 
     const body = new FormData();
@@ -164,6 +182,7 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
       fileResults = files.map((f) => ({ filename: f.name, error: msg }));
     }
 
+    setProgress(100);
     setResults(fileResults);
     setPhase("done");
     if (anySuccess) onSuccess();
@@ -330,6 +349,53 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                       </span>
                     </div>
                   )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Upload progress */}
+            <AnimatePresence initial={false}>
+              {isUploading && (
+                <motion.div
+                  key="progress"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+                  className="overflow-hidden mt-4"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="mono text-[11px] uppercase tracking-widest text-[#8a8a8a]">
+                      Parsing statement
+                    </span>
+                    <span
+                      className="mono text-[11px] text-[#ededed] tabular-nums"
+                      aria-label={`${Math.round(progress)} percent complete`}
+                    >
+                      {Math.round(progress)}%
+                    </span>
+                  </div>
+                  <div
+                    className="h-1.5 w-full rounded-full bg-[#1a1a1a] overflow-hidden"
+                    role="progressbar"
+                    aria-valuenow={Math.round(progress)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <motion.div
+                      className="h-full bg-[#F38B00] rounded-full"
+                      initial={false}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                    />
+                  </div>
+                  <p className="mt-2 text-[11px] text-[#5a5a5f] mono">
+                    {files.some((f) => f.name.toLowerCase().endsWith(".pdf"))
+                      ? "PDFs go through Aria — this may take ~20s per file."
+                      : "Parsing locally — should be quick."}
+                  </p>
                 </motion.div>
               )}
             </AnimatePresence>
