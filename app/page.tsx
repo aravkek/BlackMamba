@@ -110,6 +110,41 @@ export default function HomePage() {
     void fetchWallet();
   }, [refresh, fetchWallet]); // eslint-disable-line react-hooks/set-state-in-effect
 
+  // The LiveCancelPanel dispatches "bm:cancel-confirmed" when an agent run
+  // reaches status:success AND the server has acknowledged the removal.
+  // We refresh the rail (the cancelled sub is now filtered server-side),
+  // mark the id locally for any fade-out animations, and trigger the wallet
+  // reveal so the user gets a burner card for the cancelled merchant.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ merchant: string; runId: string }>)
+        .detail;
+      if (!detail || typeof detail.merchant !== "string") return;
+
+      const matched = subscriptions.find(
+        (s) => s.service.toLowerCase() === detail.merchant.toLowerCase(),
+      );
+      if (matched) {
+        setCancelledIds((prev) => {
+          const next = new Set(prev);
+          next.add(matched.id);
+          return next;
+        });
+        setReveal({
+          open: true,
+          merchant: matched.service,
+          limit: Math.max(1, Math.round(matched.amount)),
+        });
+      }
+      void refresh();
+      window.setTimeout(() => void fetchWallet(), 600);
+      window.setTimeout(() => void fetchWallet(), 2000);
+    };
+
+    window.addEventListener("bm:cancel-confirmed", handler);
+    return () => window.removeEventListener("bm:cancel-confirmed", handler);
+  }, [subscriptions, refresh, fetchWallet]);
+
   const sendMessage = useCallback(
     async (text: string) => {
       const userMsg: ChatMessage = {

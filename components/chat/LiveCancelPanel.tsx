@@ -2,6 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Confetti } from "./Confetti";
+
+/**
+ * Event fired on `window` once the agent reports success AND the server has
+ * acknowledged the subscription removal. page.tsx listens for this to refresh
+ * the rail and trigger the wallet reveal.
+ */
+export type CancelConfirmedDetail = { merchant: string; runId: string };
 
 type CancelStep = {
   index: number;
@@ -33,7 +41,9 @@ type LiveCancelPanelProps = {
 export function LiveCancelPanel({ runId, merchant }: LiveCancelPanelProps) {
   const [job, setJob] = useState<JobState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [celebrate, setCelebrate] = useState(false);
   const startedAt = useRef(Date.now());
+  const confirmedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,13 +85,48 @@ export function LiveCancelPanel({ runId, merchant }: LiveCancelPanelProps) {
   const status = job?.status ?? "pending";
   const steps = job?.steps ?? [];
 
+  // On the FIRST time we observe status:success, confirm the cancel with the
+  // server (which marks the subscription as removed), start the confetti
+  // burst, and notify the page so it can refresh the rail + open the wallet
+  // reveal. Guarded by a ref so we only fire once even if the panel re-renders.
+  useEffect(() => {
+    if (status !== "success" || confirmedRef.current) return;
+    confirmedRef.current = true;
+
+    setCelebrate(true);
+
+    void (async () => {
+      try {
+        await fetch("/api/subscriptions/cancel-confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ merchant }),
+        });
+      } catch (err) {
+        console.error("[LiveCancelPanel] cancel-confirm failed", err);
+      } finally {
+        window.dispatchEvent(
+          new CustomEvent<CancelConfirmedDetail>("bm:cancel-confirmed", {
+            detail: { merchant, runId },
+          }),
+        );
+      }
+    })();
+  }, [status, merchant, runId]);
+
   return (
     <div
-      className="mt-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] overflow-hidden"
+      className={[
+        "relative mt-3 rounded-xl border bg-[color:var(--surface)] overflow-hidden transition-colors duration-300",
+        status === "success"
+          ? "border-[#10b981]/40 shadow-[0_0_0_1px_rgba(16,185,129,0.18),0_8px_32px_-8px_rgba(16,185,129,0.25)]"
+          : "border-[color:var(--border)]",
+      ].join(" ")}
       role="status"
       aria-live="polite"
       aria-label={`Cancelling ${merchant}`}
     >
+      <Confetti active={celebrate} />
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-[color:var(--border)]">
         <div className="flex items-center gap-2.5 min-w-0">
