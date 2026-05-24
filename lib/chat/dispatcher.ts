@@ -81,6 +81,91 @@ function getBaseAndKey(): { base: string; key: string } | null {
   return { base, key };
 }
 
+// ---------------------------------------------------------------------------
+// Backboard Assistant singleton
+// ---------------------------------------------------------------------------
+//
+// Backboard drops per-message `system_prompt` during /threads/tool-outputs
+// continuation, which makes Aria revert to a generic chatbot voice after any
+// tool call. The fix is to register a persistent Assistant whose system_prompt
+// sticks for the lifetime of the thread.
+//
+// We create one Assistant per (server-process, system_prompt) pair, cached
+// in-memory, and pass `assistant_id` on every /threads/messages call.
+
+let cachedAssistantId: string | null =
+  process.env.BACKBOARD_ASSISTANT_ID || null;
+let cachedAssistantPromptHash: string | null = null;
+let pendingAssistantPromise: Promise<string | null> | null = null;
+
+function shortHash(s: string): string {
+  // Tiny non-crypto hash so we recreate the Assistant if the prompt changes
+  // between dev-server restarts (e.g. after editing route.ts SYSTEM_PROMPT).
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 31 + s.charCodeAt(i)) | 0;
+  }
+  return h.toString(36);
+}
+
+async function ensureAssistant(systemPrompt: string): Promise<string | null> {
+  const env = getBaseAndKey();
+  if (!env) return null;
+
+  const promptHash = shortHash(systemPrompt);
+  if (cachedAssistantId && cachedAssistantPromptHash === promptHash) {
+    return cachedAssistantId;
+  }
+  if (pendingAssistantPromise) return pendingAssistantPromise;
+
+  pendingAssistantPromise = (async () => {
+    try {
+      const res = await fetch(`${env.base}/assistants`, {
+        method: "POST",
+        headers: {
+          "X-API-Key": env.key,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "Aria (BlackMamba)",
+          system_prompt: systemPrompt,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        console.error(
+          "[dispatcher] assistant create non_ok",
+          res.status,
+          detail.slice(0, 300),
+        );
+        return null;
+      }
+
+      const json = (await res.json()) as { assistant_id?: string };
+      if (!json.assistant_id) {
+        console.error("[dispatcher] assistant create returned no id", json);
+        return null;
+      }
+      cachedAssistantId = json.assistant_id;
+      cachedAssistantPromptHash = promptHash;
+      console.log(
+        "[dispatcher] registered Backboard Assistant",
+        json.assistant_id,
+      );
+      return cachedAssistantId;
+    } catch (err) {
+      console.error("[dispatcher] assistant create threw", err);
+      return null;
+    } finally {
+      pendingAssistantPromise = null;
+    }
+  })();
+
+  return pendingAssistantPromise;
+}
+
 async function sendMessage(
   body: Record<string, unknown>,
 ): Promise<BackboardMessageResponse | null> {
@@ -217,6 +302,13 @@ export async function dispatch(input: DispatchInput): Promise<DispatchResult> {
   const provider = input.provider ?? process.env.BACKBOARD_PROVIDER ?? DEFAULT_PROVIDER;
   const model = input.model ?? process.env.BACKBOARD_MODEL ?? DEFAULT_MODEL;
 
+  // Register (or reuse) a persistent Backboard Assistant so the system prompt
+  // sticks across tool-output continuations. Falls back to per-message
+  // system_prompt if registration fails.
+  const assistantId = input.systemPrompt
+    ? await ensureAssistant(input.systemPrompt)
+    : null;
+
   const initialBody: Record<string, unknown> = {
     content: input.userContent,
     llm_provider: provider,
@@ -225,7 +317,11 @@ export async function dispatch(input: DispatchInput): Promise<DispatchResult> {
     tools: TOOL_SCHEMAS,
   };
   if (input.threadId) initialBody.thread_id = input.threadId;
-  if (input.systemPrompt) initialBody.system_prompt = input.systemPrompt;
+  if (assistantId) {
+    initialBody.assistant_id = assistantId;
+  } else if (input.systemPrompt) {
+    initialBody.system_prompt = input.systemPrompt;
+  }
 
   let response = await withRetry(
     () => sendMessage(initialBody),
