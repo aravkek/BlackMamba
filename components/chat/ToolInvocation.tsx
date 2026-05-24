@@ -45,7 +45,9 @@ function getSummary(
       if (isRecord(result)) {
         if (result.success === true) {
           const merchant =
-            typeof result.merchant === "string" ? result.merchant : "subscription";
+            typeof result.merchant === "string"
+              ? result.merchant
+              : "subscription";
           const duration =
             typeof result.duration_ms === "number"
               ? formatDuration(result.duration_ms)
@@ -119,14 +121,10 @@ export function ToolInvocationDisplay({ invocation }: ToolInvocationProps) {
   const { text, isError } = getSummary(name, result);
 
   return (
-    <div className="flex items-baseline gap-1.5 text-[11px] mt-1">
-      <span className="text-[#8a8a8a]" aria-hidden="true">
-        →
-      </span>
-      <span className="mono text-[#8a8a8a]">{name}</span>
-      <span className="text-[#555]" aria-hidden="true">
-        ·
-      </span>
+    <div className="mt-3 text-[11px] mono text-[#5a5a5f] flex items-baseline gap-1.5">
+      <span aria-hidden="true">&rarr;</span>
+      <span className="text-[#8a8a8f]">{name}</span>
+      <span aria-hidden="true">&middot;</span>
       <span className={isError ? "text-[#ff8a8a]" : "text-[#F38B00]"}>
         {text}
       </span>

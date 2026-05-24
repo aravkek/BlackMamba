@@ -24,18 +24,24 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const time = formatTime(createdAt);
 
   return (
-    <div className="mt-6">
-      <div className="flex items-baseline gap-2 mb-1">
-        <span className="mono text-[11px] uppercase text-[#555] tracking-wide">
+    <div className="mt-8">
+      {/* Role + timestamp eyebrow */}
+      <div className="flex items-baseline gap-1.5 mb-2">
+        <span className="mono text-[10px] uppercase tracking-widest text-[#5a5a5f]">
           {roleLabel}
         </span>
-        <span className="mono text-[11px] text-[#3a3a3a]">{time}</span>
+        <span className="mono text-[10px] text-[#5a5a5f]">&middot;</span>
+        <span className="mono text-[10px] text-[#5a5a5f]">{time}</span>
       </div>
+
+      {/* Message content */}
       <p className="text-[15px] text-[#ededed] leading-relaxed whitespace-pre-wrap">
         {content}
       </p>
+
+      {/* Tool call trace */}
       {toolCalls && toolCalls.length > 0 && (
-        <div className="mt-2" role="list" aria-label="Tool calls">
+        <div role="list" aria-label="Tool calls">
           {toolCalls.map((tc, i) => (
             <div key={`${tc.name}-${i}`} role="listitem">
               <ToolInvocationDisplay invocation={tc} />

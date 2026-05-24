@@ -1,45 +1,46 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import type { ChatMessage } from "./types";
 import { MessageBubble } from "./MessageBubble";
 
 const NEAR_BOTTOM_THRESHOLD = 80;
 
-const DOT_VARIANTS = {
-  animate: (i: number) => ({
-    opacity: [0.3, 1, 0.3],
-    y: [0, -3, 0],
+const MSG_VARIANTS = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
     transition: {
-      duration: 1.2,
-      ease: "easeInOut" as const,
-      repeat: Infinity,
-      delay: i * 0.2,
+      duration: 0.3,
+      ease: [0.2, 0.8, 0.2, 1] as [number, number, number, number],
     },
-  }),
+  },
 };
 
 function PendingDots() {
   return (
-    <div className="mt-6">
-      <div className="flex items-baseline gap-2 mb-1">
-        <span className="mono text-[11px] uppercase text-[#555] tracking-wide">
+    <div className="mt-8" role="status" aria-label="Aria is responding">
+      <div className="flex items-baseline gap-1.5 mb-2">
+        <span className="mono text-[10px] uppercase tracking-widest text-[#5a5a5f]">
           aria
         </span>
       </div>
-      <div
-        className="flex items-center gap-1"
-        role="status"
-        aria-label="Aria is responding"
-      >
+      <div className="flex items-center gap-1.5">
         {[0, 1, 2].map((i) => (
           <motion.span
             key={i}
-            custom={i}
-            animate="animate"
-            variants={DOT_VARIANTS}
-            className="text-[#8a8a8a] text-[18px] leading-none select-none"
+            animate={{
+              opacity: [0.3, 0.6, 0.3],
+            }}
+            transition={{
+              duration: 1.4,
+              ease: "easeInOut",
+              repeat: Infinity,
+              delay: i * 0.1,
+            }}
+            className="text-[#F38B00] text-[16px] leading-none select-none"
             aria-hidden="true"
           >
             &bull;
@@ -52,11 +53,13 @@ function PendingDots() {
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
-      <span className="eyebrow">Statement Assistant</span>
-      <span className="mono text-[12px] text-[#555]">
-        try: &ldquo;cancel my spotify&rdquo;
-      </span>
+    <div className="flex flex-col items-center justify-center h-full">
+      <h1 className="serif text-6xl text-[#ededed] tracking-tight">
+        Switchback.
+      </h1>
+      <p className="mt-4 mono text-xs uppercase tracking-widest text-[#5a5a5f]">
+        cancel &middot; classify &middot; audit
+      </p>
     </div>
   );
 }
@@ -66,14 +69,19 @@ type ChatThreadProps = {
   pendingAssistant?: boolean;
 };
 
-export function ChatThread({ messages, pendingAssistant = false }: ChatThreadProps) {
+export function ChatThread({
+  messages,
+  pendingAssistant = false,
+}: ChatThreadProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const isNearBottom = (): boolean => {
     const el = scrollRef.current;
     if (!el) return true;
-    return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_THRESHOLD;
+    return (
+      el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_THRESHOLD
+    );
   };
 
   useEffect(() => {
@@ -85,17 +93,23 @@ export function ChatThread({ messages, pendingAssistant = false }: ChatThreadPro
   const isEmpty = messages.length === 0 && !pendingAssistant;
 
   return (
-    <div
-      ref={scrollRef}
-      className="overflow-y-auto px-1 h-full no-scrollbar"
-    >
+    <div ref={scrollRef} className="overflow-y-auto px-1 h-full no-scrollbar">
       {isEmpty ? (
         <EmptyState />
       ) : (
         <>
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
-          ))}
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => (
+              <motion.div
+                key={msg.id}
+                variants={MSG_VARIANTS}
+                initial="hidden"
+                animate="visible"
+              >
+                <MessageBubble message={msg} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
           {pendingAssistant && <PendingDots />}
         </>
       )}

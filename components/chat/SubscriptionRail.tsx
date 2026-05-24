@@ -8,10 +8,13 @@ type Props = {
   cancelledIds?: ReadonlySet<string>;
 };
 
-function formatAnnualTotal(subscriptions: Subscription[]): string {
-  const total = subscriptions.reduce((sum, s) => {
+function computeAnnualTotal(subscriptions: Subscription[]): number {
+  return subscriptions.reduce((sum, s) => {
     return sum + (s.frequency === "monthly" ? s.amount * 12 : s.amount);
   }, 0);
+}
+
+function formatTotal(total: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -24,20 +27,31 @@ function buildAriaLabel(sub: Subscription): string {
   return `Cancel ${sub.service} subscription, $${sub.amount.toFixed(2)} ${freq}`;
 }
 
+function formatAmount(sub: Subscription): string {
+  return `$${sub.amount.toFixed(2)}`;
+}
+
 export function SubscriptionRail({
   subscriptions,
   onPick,
   cancelledIds,
 }: Props) {
-  const annualTotal = formatAnnualTotal(subscriptions);
+  const annualTotal = computeAnnualTotal(subscriptions);
+  const totalFormatted = formatTotal(annualTotal);
 
   return (
-    <aside className="w-full md:w-80 shrink-0 pl-6 pt-12 flex flex-col">
-      <div className="eyebrow mb-4">Subscriptions</div>
-      <div className="hairline mb-3" />
+    <aside className="w-full md:w-80 shrink-0 flex flex-col">
+      {/* Eyebrow header */}
+      <div className="mono text-[10px] uppercase tracking-widest text-[#5a5a5f] mb-3">
+        Subscriptions
+      </div>
 
+      {/* Hairline separator */}
+      <div className="h-px bg-white/[0.06] mb-3" />
+
+      {/* Subscription list */}
       {subscriptions.length === 0 ? (
-        <p className="mono text-[13px] text-[#555] text-center py-4">
+        <p className="mono text-[12px] text-[#5a5a5f] text-center py-4">
           no subscriptions yet
         </p>
       ) : (
@@ -53,39 +67,30 @@ export function SubscriptionRail({
                 <button
                   type="button"
                   disabled={isCancelled}
-                  onClick={() => onPick(sub)}
+                  onClick={() => !isCancelled && onPick(sub)}
                   aria-label={buildAriaLabel(sub)}
                   className={[
-                    "w-full flex items-center justify-between py-2.5 text-left",
-                    "-mx-2 px-2 rounded",
-                    "transition-colors duration-150",
+                    "w-full flex items-center justify-between py-2.5 -mx-2 px-2 rounded-md text-left transition-colors duration-150",
                     isCancelled
-                      ? "opacity-40 cursor-default"
-                      : "hover:bg-[#141414] cursor-pointer",
-                  ]
-                    .join(" ")
-                    .trim()}
+                      ? "opacity-40 line-through cursor-default"
+                      : "hover:bg-[#161616] cursor-pointer",
+                  ].join(" ")}
                 >
-                  <span
-                    className={[
-                      "text-[14px] text-[#ededed] flex items-center",
-                      isCancelled ? "line-through" : "",
-                    ]
-                      .join(" ")
-                      .trim()}
-                  >
+                  <span className="text-[14px] text-[#ededed] flex items-center min-w-0">
                     {sub.detectedFromStatement && (
                       <span
                         aria-hidden
-                        className="inline-block w-1 h-1 rounded-full bg-[#F38B00] mr-2 align-middle"
-                      />
+                        className="text-[#F38B00] mr-2 shrink-0"
+                      >
+                        &bull;
+                      </span>
                     )}
-                    {sub.service}
+                    <span className="truncate">{sub.service}</span>
                   </span>
                   <span
-                    className={`mono text-[14px] tabular-nums ${amountColor}`}
+                    className={`mono text-[14px] tabular-nums shrink-0 ml-3 ${amountColor}`}
                   >
-                    ${sub.amount.toFixed(2)}
+                    {formatAmount(sub)}
                   </span>
                 </button>
               </li>
@@ -94,15 +99,18 @@ export function SubscriptionRail({
         </ul>
       )}
 
+      {/* Annual at-stake total */}
       {subscriptions.length > 0 && (
         <>
-          <div className="hairline mt-3 mb-3" />
-          <div className="eyebrow">Annual at-stake</div>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="mono text-[20px] text-[#F38B00] tabular-nums">
-              {annualTotal}
+          <div className="h-px bg-white/[0.06] mt-3 mb-6" />
+          <div className="mono text-[10px] uppercase tracking-widest text-[#5a5a5f]">
+            Annual at-stake
+          </div>
+          <div className="mt-2 flex items-baseline">
+            <span className="serif text-4xl text-[#ededed] tabular-nums leading-none">
+              {totalFormatted}
             </span>
-            <span className="text-[11px] text-[#555]">/yr</span>
+            <span className="mono text-[11px] text-[#5a5a5f] ml-2">/yr</span>
           </div>
         </>
       )}

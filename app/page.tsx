@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 import { BrandMark } from "@/components/BrandMark";
 import {
@@ -12,7 +13,7 @@ import {
 } from "@/components/chat";
 import { UploadModal } from "@/components/UploadModal";
 import { VirtualCardReveal } from "@/components/VirtualCardReveal";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { SUBSCRIPTIONS, type Subscription } from "@/lib/data";
 
 type ApiChatResponse = {
@@ -229,39 +230,47 @@ export default function HomePage() {
   );
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#0a0a0a] text-[#ededed] overflow-hidden">
+    <div className="flex flex-col h-screen w-full bg-[#0a0a0a] text-[#ededed] overflow-hidden relative z-10">
       {/* Header */}
-      <header className="border-b border-[#262626] px-6 sm:px-10 py-4 flex items-center justify-between shrink-0">
+      <motion.header
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className="flex items-center justify-between px-8 py-6 border-b border-white/[0.06] shrink-0"
+      >
         <div className="flex items-center gap-3">
-          <BrandMark id="tangerine" size={26} />
-          <span className="display text-[18px] tracking-tight">BLACKMAMBA</span>
+          <BrandMark id="tangerine" size={22} />
+          <span className="serif text-[20px] tracking-tight leading-none">
+            Switchback
+          </span>
         </div>
         <Button
-          variant="secondary"
+          variant="ghost"
           size="sm"
           onClick={() => setUploadOpen(true)}
+          className="border border-white/[0.08] hover:border-white/[0.15] hover:bg-white/[0.03] text-[#ededed]"
         >
           Upload statement
         </Button>
-      </header>
+      </motion.header>
 
       {/* Main body: chat column + subscription rail */}
-      {/*
-        Mobile (< md): flex-col-reverse so rail stacks ABOVE chat visually,
-        but the composer is sticky below via the outer flex column.
-        Desktop (md+): side-by-side grid with the rail on the right.
-      */}
-      <div className="flex-1 min-h-0 flex flex-col-reverse md:grid md:grid-cols-[1fr_320px] overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1, ease: [0.2, 0.8, 0.2, 1] }}
+        className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[1fr_320px] overflow-hidden"
+      >
         {/* Chat column */}
-        <div className="flex flex-col min-h-0 overflow-hidden border-t border-[#262626] md:border-t-0 md:border-r md:border-[#262626]">
-          <div className="flex-1 min-h-0 px-6 sm:px-10 pt-8 pb-2">
+        <div className="flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 px-8 md:px-12 pt-8 pb-2">
             <ChatThread messages={messages} pendingAssistant={pending} />
           </div>
           <ChatComposer onSend={sendMessage} disabled={pending} />
         </div>
 
         {/* Subscription rail + persistent wallet */}
-        <div className="overflow-y-auto no-scrollbar px-6 sm:px-0 pr-0 sm:pr-6 md:pr-10 pt-8 pb-4">
+        <div className="overflow-y-auto no-scrollbar px-8 pt-8 pb-8 border-l border-white/[0.06] hidden md:block">
           <SubscriptionRail
             subscriptions={subscriptions}
             onPick={handleRailPick}
@@ -269,7 +278,7 @@ export default function HomePage() {
           />
           <WalletSection cards={walletCards} />
         </div>
-      </div>
+      </motion.div>
 
       {/* Upload modal */}
       <UploadModal

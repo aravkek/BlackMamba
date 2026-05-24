@@ -1,7 +1,14 @@
 "use client";
 
-import { useRef, useState, useCallback, type KeyboardEvent, type ChangeEvent } from "react";
-import { Button } from "@/components/ui/Button";
+import {
+  useRef,
+  useState,
+  useCallback,
+  type KeyboardEvent,
+  type ChangeEvent,
+} from "react";
+import { SendHorizontal } from "lucide-react";
+import { Button } from "@/components/shadcn/button";
 
 const MAX_ROWS = 6;
 
@@ -17,6 +24,7 @@ export function ChatComposer({
   placeholder,
 }: ChatComposerProps) {
   const [value, setValue] = useState("");
+  const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const resizeTextarea = useCallback(() => {
@@ -49,12 +57,9 @@ export function ChatComposer({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter") {
-        const isModifier = e.metaKey || e.ctrlKey;
-        if (isModifier || !e.shiftKey) {
-          e.preventDefault();
-          submit();
-        }
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        submit();
       }
     },
     [submit],
@@ -63,45 +68,62 @@ export function ChatComposer({
   const hasContent = value.trim().length > 0;
 
   return (
-    <div className="border-t border-[#262626] bg-[#0a0a0a] px-6 py-4 max-sm:px-4 max-sm:py-3">
-      <div className="flex items-end gap-3">
-        <div className="relative flex-1">
+    <div className="px-8 md:px-12 pb-8 pt-6">
+      <div
+        className={[
+          "glass rounded-2xl max-w-3xl mx-auto transition-shadow duration-200",
+          focused
+            ? "shadow-[0_0_0_1px_rgba(243,139,0,0.10),0_8px_32px_-8px_rgba(0,0,0,0.6)]"
+            : "shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]",
+        ].join(" ")}
+      >
+        <div className="px-4 pt-4 pb-3">
           <textarea
             ref={textareaRef}
             value={value}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             disabled={disabled}
             placeholder={placeholder ?? "Message Aria…"}
             rows={1}
             aria-label="Message input"
             className="
               w-full resize-none bg-transparent
-              text-[15px] text-[#ededed] placeholder:text-[#555]
-              leading-relaxed outline-none
+              text-[15px] text-[#ededed] placeholder:text-[#5a5a5f]
+              leading-relaxed outline-none border-none
               disabled:opacity-40
               overflow-y-auto no-scrollbar
             "
           />
         </div>
-        {hasContent && (
-          <span
-            className="mono text-[11px] text-[#3a3a3a] pb-1 shrink-0 select-none"
-            aria-hidden="true"
-          >
-            Cmd &#8629;
+
+        {/* Bottom action row */}
+        <div className="flex items-center justify-between px-4 pb-3">
+          <span className="mono text-[10px] text-[#5a5a5f] uppercase tracking-widest select-none">
+            aria
           </span>
-        )}
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={submit}
-          disabled={disabled || !hasContent}
-          aria-label={disabled ? "Sending message" : "Send message"}
-          className="shrink-0 mb-px"
-        >
-          {disabled ? "Sending…" : "Send"}
-        </Button>
+          <div className="flex items-center gap-2">
+            {hasContent && (
+              <span
+                className="mono text-[11px] text-[#5a5a5f] select-none"
+                aria-hidden="true"
+              >
+                &#8629;
+              </span>
+            )}
+            <Button
+              onClick={submit}
+              disabled={disabled || !hasContent}
+              aria-label={disabled ? "Sending message" : "Send message"}
+              size="sm"
+              className="bg-[#F38B00] hover:bg-[#ff9a14] text-black border-0 shrink-0"
+            >
+              <SendHorizontal className="size-4" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
