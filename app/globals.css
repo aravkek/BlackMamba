@@ -5,13 +5,14 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* ── Brand palette ───────────────────────────────────────────────────────── */
+  /* ── Brand palette (dark — default) ───────────────────────────────────────── */
   --bg: #0a0a0a;
   --surface: #111111;
   --surface-2: #111111;
   --surface-3: #161616;
   --surface-4: #1a1a1a;
   --border: #262626;
+  --border-soft: rgba(255, 255, 255, 0.06);
   --border-strong: #3a3a3a;
   --fg: #ededed;
   --fg-muted: #8a8a8f;
@@ -20,6 +21,11 @@
   --tangerine-dim: #c47000;
   --success: #10b981;
   --ring-subtle: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.02);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-inset: rgba(255, 255, 255, 0.05);
+  --noise-opacity: 0.02;
+  --glow-color: 243, 139, 0;
 
   /* ── shadcn semantic tokens mapped to our dark palette ──────────────────── */
   --background: var(--bg);
@@ -110,6 +116,46 @@ body {
   color: var(--fg);
 }
 
+/* ── Light theme overrides ───────────────────────────────────────────────── */
+:root.light {
+  --bg: #fafaf7;
+  --surface: #ffffff;
+  --surface-2: #f5f4ef;
+  --surface-3: #efeee8;
+  --surface-4: #e9e7e0;
+  --border: #d9d6cd;
+  --border-soft: rgba(0, 0, 0, 0.08);
+  --border-strong: #b8b4a8;
+  --fg: #1a1a1a;
+  --fg-muted: #595958;
+  --fg-dim: #8a8780;
+  --tangerine: #d97500;
+  --tangerine-dim: #b35d00;
+  --ring-subtle: rgba(0, 0, 0, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-inset: rgba(255, 255, 255, 0.4);
+  --noise-opacity: 0.015;
+  --glow-color: 217, 117, 0;
+
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --card: var(--surface);
+  --card-foreground: var(--fg);
+  --popover: var(--surface);
+  --popover-foreground: var(--fg);
+  --primary: var(--tangerine);
+  --primary-foreground: #ffffff;
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--fg);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--fg-muted);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--fg);
+  --input: var(--border);
+  --ring: var(--tangerine);
+}
+
 body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "ss01", "cv11";
@@ -127,7 +173,7 @@ body::before {
   z-index: 0;
   background: radial-gradient(
     ellipse 60% 50% at 0% 0%,
-    rgba(243, 139, 0, 0.04) 0%,
+    rgba(var(--glow-color), 0.04) 0%,
     transparent 70%
   );
 }
@@ -139,7 +185,7 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.02;
+  opacity: var(--noise-opacity);
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
   background-size: 256px 256px;
   background-repeat: repeat;
@@ -181,10 +227,10 @@ body::after {
 
 /* Glass card utility — floating composer, overlays */
 .glass {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px var(--glass-inset);
 }
 
 /* Hairline divider used across surfaces */
