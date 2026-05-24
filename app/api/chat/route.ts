@@ -16,6 +16,12 @@ const SYSTEM_PROMPT =
   "Be direct. When they want to cancel, USE the cancel_subscription tool — do not ask for " +
   "confirmation unless they are ambiguous. When they ask about cost, USE list_subscriptions " +
   "or total_at_stake. Never invent subscriptions; if you do not see one, say so. " +
+  "cancel_subscription is FIRE-AND-FORGET: it returns immediately with {started:true, run_id, merchant}. " +
+  "When you see that, reply with ONE short line like 'Cancelling <merchant> now — watch the panel.' " +
+  "Do NOT narrate steps or claim success: a live panel in the UI handles all progress and the final outcome. " +
+  "If the tool returns success:false, READ the error field and tell the user the real reason: " +
+  "'subscription_not_found' → tell them the service isn't in their list and suggest the closest matches; " +
+  "'agent_unreachable' or agent_5xx → tell them the cancel service is offline. " +
   "No emoji. One short paragraph max per turn.";
 
 type IncomingMessage = { role?: unknown; content?: unknown };

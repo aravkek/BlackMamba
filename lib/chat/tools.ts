@@ -222,19 +222,21 @@ async function execListSubscriptions(
 }
 
 type CancelArgs = { merchant: string; headless?: boolean };
-type AgentStep = { index: number; action: string; url?: string | null; note?: string | null };
-type AgentResult = {
-  success: boolean;
+type StartedRun = {
+  started: true;
+  run_id: string;
   merchant: string;
-  duration_ms: number;
-  steps: AgentStep[];
-  final_url?: string | null;
-  error?: string | null;
 };
 type CancelResult =
-  | AgentResult
-  | { success: false; error: "subscription_not_found"; suggestions: SubSummary[] };
+  | StartedRun
+  | { success: false; error: "subscription_not_found"; suggestions: SubSummary[] }
+  | { success: false; merchant: string; error: string };
 
+/**
+ * Fire-and-forget cancel: starts the agent run via /cancel/start and returns
+ * the run_id immediately. The UI polls /api/cancel-live?run_id=... for live
+ * progress. Aria's reply is a single one-liner; the panel does the rest.
+ */
 async function execCancelSubscription(
   args: CancelArgs,
   ctx: ToolContext,
@@ -251,7 +253,7 @@ async function execCancelSubscription(
   }
 
   try {
-    const upstream = await fetch(`${AGENT_BASE_URL}/cancel`, {
+    const upstream = await fetch(`${AGENT_BASE_URL}/cancel/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -260,29 +262,30 @@ async function execCancelSubscription(
         headless: args.headless ?? false,
         max_steps: 40,
       }),
-      signal: AbortSignal.timeout(305_000),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!upstream.ok) {
       const detail = await upstream.text().catch(() => "");
-      console.error("[chat/tools] cancel agent_error", upstream.status, detail.slice(0, 200));
+      console.error("[chat/tools] cancel/start failed", upstream.status, detail.slice(0, 200));
       return {
         success: false,
         merchant: match.service,
-        duration_ms: 0,
-        steps: [],
         error: `agent_${upstream.status}`,
       };
     }
 
-    return (await upstream.json()) as AgentResult;
+    const json = (await upstream.json()) as { run_id: string; merchant: string };
+    return {
+      started: true,
+      run_id: json.run_id,
+      merchant: json.merchant,
+    };
   } catch (err) {
-    console.error("[chat/tools] cancel fetch_failure", err);
+    console.error("[chat/tools] cancel/start fetch_failure", err);
     return {
       success: false,
       merchant: match.service,
-      duration_ms: 0,
-      steps: [],
       error: err instanceof Error ? err.message : "agent_unreachable",
     };
   }
