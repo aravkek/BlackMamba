@@ -46,15 +46,32 @@ class CancelResult(BaseModel):
 def _pick_llm():
     """Return (provider_name, llm) using browser-use's native chat classes.
 
-    Priority:
-    1. Backboard (sponsor, OpenAI-compatible) — set BACKBOARD_API_KEY
-    2. OpenAI direct
-    3. Anthropic
-    4. Google
+    Priority (most reliable first — Backboard was returning Connection
+    errors during the hackathon, so demoted):
+    1. OpenAI direct (if OPENAI_API_KEY set)
+    2. Anthropic (if ANTHROPIC_API_KEY set)
+    3. Google (if GOOGLE_API_KEY set)
+    4. Backboard (if BACKBOARD_API_KEY set) — sponsor, OpenAI-compatible
+    5. ChatBrowserUse — Browser-Use's hosted free LLM, no key required.
+       Built-in retries (max_retries=5) make it the safest fallback.
     """
-    from browser_use import ChatAnthropic, ChatGoogle, ChatOpenAI
+    from browser_use import ChatAnthropic, ChatBrowserUse, ChatGoogle, ChatOpenAI
 
-    if os.getenv("BACKBOARD_API_KEY"):
+    # Allow forcing a provider via env (useful for debugging / demo overrides).
+    forced = os.getenv("BLACKMAMBA_LLM", "").strip().lower()
+
+    if forced != "browseruse" and os.getenv("OPENAI_API_KEY"):
+        return "openai", ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+    if forced != "browseruse" and os.getenv("ANTHROPIC_API_KEY"):
+        # Sonnet 4.6 — strongest browser-agent model accessible on this tier.
+        # Override with ANTHROPIC_MODEL=claude-haiku-4-5-20251001 for speed.
+        model_id = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+        return "anthropic", ChatAnthropic(model=model_id, temperature=0.0)
+    if forced != "browseruse" and os.getenv("GOOGLE_API_KEY"):
+        return "google", ChatGoogle(
+            model="gemini-2.0-flash-exp", temperature=0.0
+        )
+    if forced != "browseruse" and os.getenv("BACKBOARD_API_KEY"):
         base = os.getenv("BACKBOARD_BASE_URL", "https://api.backboard.io/v1")
         if not base.rstrip("/").endswith("/v1"):
             base = base.rstrip("/") + "/v1"
@@ -65,27 +82,28 @@ def _pick_llm():
             api_key=os.environ["BACKBOARD_API_KEY"],
             temperature=0.0,
         )
-    if os.getenv("OPENAI_API_KEY"):
-        return "openai", ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
-    if os.getenv("ANTHROPIC_API_KEY"):
-        return "anthropic", ChatAnthropic(
-            model="claude-haiku-4-5-20251001", temperature=0.0
-        )
-    if os.getenv("GOOGLE_API_KEY"):
-        return "google", ChatGoogle(
-            model="gemini-2.0-flash-exp", temperature=0.0
-        )
-    raise RuntimeError(
-        "no_llm_key: set one of BACKBOARD_API_KEY, OPENAI_API_KEY, "
-        "ANTHROPIC_API_KEY, GOOGLE_API_KEY"
+
+    # Final fallback: Browser-Use's hosted LLM. No API key required for the
+    # free tier; built specifically for browser-automation prompts.
+    bu_key = os.getenv("BROWSER_USE_API_KEY")
+    return "browseruse", ChatBrowserUse(
+        model="bu-2-0",
+        api_key=bu_key,
+        max_retries=5,
     )
 
 
 # Per-merchant cancel URL hints so the agent doesn't waste steps hunting
 # for the billing page. Add entries here as we learn merchant flows.
 MERCHANT_HINTS: dict[str, str] = {
-    "nytimes": "https://www.nytimes.com/account",
-    "new york times": "https://www.nytimes.com/account",
+    # NYTimes cancel flow lives at /subscription/cancel-survey (logged-in).
+    # The bare /account page doesn't expose cancellation; go straight to source.
+    "nytimes": "https://www.nytimes.com/subscription/cancel-survey",
+    "new york times": "https://www.nytimes.com/subscription/cancel-survey",
+    # Toronto Star — account page has the manage-subscription link.
+    "toronto star": "https://www.thestar.com/account/",
+    "torontostar": "https://www.thestar.com/account/",
+    "thestar": "https://www.thestar.com/account/",
     "spotify": "https://www.spotify.com/account/subscription/",
     "netflix": "https://www.netflix.com/account",
     "disney+": "https://www.disneyplus.com/account/subscription",
