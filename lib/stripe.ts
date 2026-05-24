@@ -30,15 +30,18 @@ export async function getOrCreateCardholder(): Promise<string> {
   if (!stripe) throw new Error("stripe_not_configured");
 
   _cardholderPromise = (async () => {
-    // Find a tagged-and-active cardholder we created previously.
+    // Prefer ANY active cardholder on the account — fast path for hackathon
+    // demos where someone created a cardholder manually in the dashboard.
     const list = await stripe.issuing.cardholders.list({ limit: 100 });
-    const reusable = list.data.find(
-      (c) =>
-        c.status === "active" &&
-        c.metadata &&
-        c.metadata.blackmamba === CARDHOLDER_TAG,
+    const anyActive = list.data.find((c) => c.status === "active");
+    if (anyActive) return anyActive.id;
+
+    // Fall back to looking for one we previously tagged (idempotency across
+    // restarts when we created via API).
+    const tagged = list.data.find(
+      (c) => c.metadata && c.metadata.blackmamba === CARDHOLDER_TAG,
     );
-    if (reusable) return reusable.id;
+    if (tagged) return tagged.id;
 
     // Otherwise create a fresh US individual cardholder with all required
     // fields. This is a TEST-mode cardholder — the address/DOB/SSN are
