@@ -1,7 +1,7 @@
 # Switchback — Build Context for Aarya + Zain
 
 **Hackathon:** TechTO Hackathon, Toronto, May 24 2026. Submit by ~5pm.
-**Sponsors to integrate:** Tangerine, ElevenLabs, Backboard.io, Codalio, Rootly.ai.
+**Sponsors integrated:** Tangerine (Plaid framing), ElevenLabs (Aria voice), Backboard.io (agent brain), Codalio (credit), Rootly.ai (failure-recovery narrative).
 
 ## What Switchback is
 
@@ -9,59 +9,85 @@ A subscription manager where every subscription gets its own virtual card. Cance
 
 **Tagline:** "The cancel button is the most valuable second in a subscriber's life. Nobody auctions it. We do."
 
+## Aarya's archived BlackMamba plans — what we borrow
+
+Aarya's original BlackMamba design (`docs/archive/blackmamba/`) had:
+
+- **Shared playbook repo** for cancellation flows — matches the browser-harness self-healing model. Becomes Switchback v1 roadmap: "the 100th Netflix cancel is 20x cheaper than the 1st."
+- **"Doer, not chatter"** — agent acts, only stops at genuine decision/block points. Adopted as the Switchback agent principle.
+- **"User wins over LLM"** — explicit user labels override agent classification. Pitch language.
+- **Local data, shared playbooks** — perfect privacy/scaling story.
+
+The Gmail/statement ingest work in Aarya's plans is the post-hackathon v2.
+
 ## Build phases (Arav's call, 2026-05-24)
 
-- **Phase 1 (now):** Browser-harness cancellation. User clicks cancel → agent goes to merchant site and actually cancels.
-- **Phase 2 (after Phase 1 works):** Stripe Issuing virtual cards + auction modal + ElevenLabs Aria voice.
+- **Phase 1 (DEMO):** Browser-Use cancellation. User clicks cancel → agent runs in Chromium → cancels live.
+- **Phase 2 (post-hackathon):** Stripe Issuing virtual cards + auction modal + ElevenLabs voice. Components exist; wiring is the remaining work.
 
-## What's built so far
+## What's built (commit `ce08556` on main)
 
-### Backend (working, typechecks clean)
+### Backend (typechecks clean, build passes)
 
-- `app/api/cards/route.ts` — Stripe Issuing test card creation (with mock fallback if no key)
-- `app/api/voice/route.ts` — ElevenLabs Aria TTS (with mock fallback)
-- `app/api/cancel/route.ts` — Cancel logic + Backboard agent message + cumulative savings
-- `lib/stripe.ts` — Stripe client + cardholder bootstrap
-- `lib/backboard.ts` — Backboard.io agent (OpenAI-compatible) with deterministic fallback
-- `lib/savings-state.ts` — In-memory savings accumulator
-- `lib/data.ts` — 5 hardcoded subs (Netflix, Spotify, Disney+, Notion, GoodLife) + bid data for auction
+- `app/api/cards/route.ts` — Stripe Issuing test cards (mock fallback)
+- `app/api/voice/route.ts` — ElevenLabs Aria TTS (mock fallback)
+- `app/api/cancel/route.ts` — Cancel + Backboard message + savings accumulator
+- `app/api/cancel-live/route.ts` — proxy to Python browser-agent on :8001
+- `lib/stripe.ts`, `lib/backboard.ts`, `lib/savings-state.ts`, `lib/data.ts`
 
-### Frontend components (built but NOT wired into page.tsx yet)
+### Python agent service (`agent/`)
 
-- `components/SubscriptionCard.tsx`
-- `components/AuctionModal.tsx` — fullscreen Netflix→Crave/Tubi/Apple TV+ auction
-- `components/VirtualCardReveal.tsx` — card flip + typewriter
-- `components/AnimatedCounter.tsx`
-- `components/BrandMark.tsx`
-- `components/ui/Button.tsx`, `Card.tsx`
+- FastAPI on **port 8001** (port 8000 was taken by another local service)
+- `cancel.py` — Browser-Use loop, supports Backboard / OpenAI / Anthropic / Google
+- `main.py` — `/health` + `/cancel` endpoints
+- Venv: `cd agent && source .venv/bin/activate`
 
-### What needs doing next
+### Frontend (`app/page.tsx` — wired and live)
 
-1. **Wire `app/page.tsx`** to use the components above (currently default scaffold)
-2. **Browser-harness service** (Phase 1) — Browser-Use or Stagehand
-3. **End-to-end test** — click cancel → browser opens → cancels → UI updates
-4. **Vercel deploy + custom domain**
-5. **5x demo rehearsal + backup video**
+- 6 subs: Netflix, Spotify, Disney+, Notion, GoodLife, NYTimes
+- Each card has a Cancel button → POST `/api/cancel-live` → Browser-Use runs Chromium live
+- Per-card state machine: idle → running → success | error
+- Animated savings counter, dark mode, Tangerine orange accent
+- Aesthetic: Stripe × Linear × Robinhood. No purple. No emoji.
 
-## API keys needed in `.env.local`
-
-```
-STRIPE_SECRET_KEY=sk_test_...
-ELEVENLABS_API_KEY=...
-BACKBOARD_API_KEY=...
-```
-
-(See `.env.example`.) All routes have graceful fallbacks if keys are missing.
-
-## Run
+## Run locally (two terminals)
 
 ```bash
-pnpm install
-pnpm run dev
+# Terminal 1 — Python agent
+cd agent
+source .venv/bin/activate
+echo "BACKBOARD_API_KEY=YOUR_KEY" > .env
+uvicorn main:app --port 8001 --reload
+
+# Terminal 2 — Next.js
+pnpm install   # if not already
+pnpm dev
 ```
+
+Then visit http://localhost:3000
+
+## API keys
+
+| Key                  | Where               | What for                        |
+| -------------------- | ------------------- | ------------------------------- |
+| `BACKBOARD_API_KEY`  | `agent/.env`        | Browser-Use LLM brain (sponsor) |
+| `STRIPE_SECRET_KEY`  | `.env.local` (root) | Phase 2 — virtual card issuance |
+| `ELEVENLABS_API_KEY` | `.env.local` (root) | Phase 2 — Aria voice narration  |
+
+All routes have mock fallbacks if keys missing — the demo never visibly breaks.
+
+## Demo target
+
+**Primary: NYTimes.** Canonical "impossible to cancel" subscription. There's a 2023 Washington Post exposé about their hostile cancel UX. Demo line: _"NYTimes is so notorious for hostile cancellation flows that the Washington Post wrote an article about it. Watch Switchback do it in 60 seconds."_
+
+**Backup: Spotify.** No MFA, simple flow, universal.
+
+## Deployment
+
+Vercel CAN'T run the Python Browser-Use service (no Chromium on serverless). **Demo from laptop**, both servers local. Vercel-deploy the Next.js for a landing-page URL post-demo.
 
 ## Coordination
 
-- Push frequently. Pull before starting new work.
-- Branch naming: `feat/<thing>` or `fix/<thing>`. PRs to main.
-- Any major scope change → update this CONTEXT.md.
+- Push to main frequently. Pull before starting new work.
+- In-person verbal coordination at the venue.
+- Major scope change → update this file.
