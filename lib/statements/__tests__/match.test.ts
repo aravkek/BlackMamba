@@ -44,6 +44,10 @@ describe("matchCharges", () => {
       SUBSCRIPTIONS,
     );
     expect(result.trialVerifyCount).toBe(1);
+    expect(result.matched).toEqual([
+      { subscriptionId: "spotify", merchantRaw: "SPOTIFY", amount: 0.01 },
+    ]);
+    expect(result.ignored).toHaveLength(0);
   });
 
   it("groups multiple charges of the same unknown merchant into one derived sub", () => {

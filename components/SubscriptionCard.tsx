@@ -69,6 +69,11 @@ export function SubscriptionCard({ sub, state = "active", onCancel }: Props) {
                   Discovered
                 </span>
               )}
+              {sub.isTrialVerify && !isCancelled && !isReplaced && (
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-[#F38B00] border border-[#3a2200] bg-[#1a0f00] px-1.5 py-0.5 rounded">
+                  Verify
+                </span>
+              )}
             </div>
             {sub.note && (
               <div className="text-[11px] text-[#8a8a8a] mt-0.5 truncate">

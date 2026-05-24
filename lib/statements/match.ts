@@ -18,11 +18,13 @@ function bestSubFor(
   chargeAmount: number,
   subs: Subscription[],
 ): Subscription | null {
+  const isVerify = isVerifyAmount(chargeAmount);
   for (const s of subs) {
     const subCanon = canonicalize(s.service);
     // Substring match either way — "netflix" matches "netflix" (service in charge)
     // and "disney+" contains "disney" (charge in service).
     if (subCanon.includes(canonicalMerchant) || canonicalMerchant.includes(subCanon)) {
+      if (isVerify) return s;
       if (amountMatches(s.amount, chargeAmount)) return s;
     }
   }

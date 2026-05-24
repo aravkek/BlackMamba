@@ -146,9 +146,10 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
           error: res.ok ? "Unexpected response from server." : `HTTP ${res.status}`,
         }));
       } else {
-        const payload = data as { results?: FileResult[] };
-        if (Array.isArray(payload.results)) {
-          fileResults = payload.results;
+        const payload = data as { files?: FileResult[]; results?: FileResult[] };
+        const returnedResults = payload.files ?? payload.results;
+        if (Array.isArray(returnedResults)) {
+          fileResults = returnedResults;
           anySuccess = fileResults.some((r) => !r.error);
         } else {
           fileResults = files.map((f) => ({

@@ -36,4 +36,11 @@ describe("parseCsv", () => {
     expect(charges).toHaveLength(2);
     expect(charges.every((c) => c.amount > 0)).toBe(true);
   });
+
+  it("parses unambiguous DD/MM/YYYY dates without producing invalid months", () => {
+    const csv = "Date,Description,Amount\n13/05/2026,EURO ROW,-9.99";
+    const charges = parseCsv(csv, "euro.csv");
+    expect(charges).toHaveLength(1);
+    expect(charges[0].postedAt).toBe("2026-05-13");
+  });
 });

@@ -11,15 +11,25 @@ function pickColumn(headers: string[], re: RegExp): string | null {
 
 function parseDate(s: string): string | null {
   const trimmed = (s ?? "").trim();
-  // MM/DD/YYYY
-  let m = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
   // YYYY-MM-DD
-  m = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  let m = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
-  // DD/MM/YYYY: only unambiguous when day slot > 12
+  // MM/DD/YYYY by default; DD/MM/YYYY only when the day slot is unambiguous.
   m = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m && Number(m[1]) > 12) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  if (m) {
+    const first = Number(m[1]);
+    const second = Number(m[2]);
+    if (first > 31 || second > 31) return null;
+    if (first > 12 && second <= 12) {
+      return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    }
+    if (second > 12 && first <= 12) {
+      return `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+    }
+    if (first <= 12 && second <= 12) {
+      return `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+    }
+  }
   return null;
 }
 
