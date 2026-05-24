@@ -76,21 +76,28 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
+    # Match the priority in cancel._pick_llm() (Backboard demoted after
+    # Connection errors during the hackathon).
     provider: Optional[str] = None
-    # Match the priority in cancel._pick_llm()
-    if os.getenv("BACKBOARD_API_KEY"):
-        provider = "backboard"
-    elif os.getenv("OPENAI_API_KEY"):
+    forced = os.getenv("BLACKMAMBA_LLM", "").strip().lower()
+    if forced != "browseruse" and os.getenv("OPENAI_API_KEY"):
         provider = "openai"
-    elif os.getenv("ANTHROPIC_API_KEY"):
+    elif forced != "browseruse" and os.getenv("ANTHROPIC_API_KEY"):
         provider = "anthropic"
-    elif os.getenv("GOOGLE_API_KEY"):
+    elif forced != "browseruse" and os.getenv("GOOGLE_API_KEY"):
         provider = "google"
+    elif forced != "browseruse" and os.getenv("BACKBOARD_API_KEY"):
+        provider = "backboard"
+    else:
+        # Browser-Use hosted free LLM — no key required.
+        provider = "browseruse"
 
+    # Even on browseruse fallback we report has_llm_key=True since the
+    # service works without a key.
     return HealthResponse(
         status="ok",
         llm_provider=provider,
-        has_llm_key=provider is not None,
+        has_llm_key=True,
     )
 
 
