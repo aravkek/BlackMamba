@@ -159,11 +159,27 @@ async def run_cancel_flow(req: CancelRequest) -> CancelResult:
 
     browser = Browser(browser_profile=profile)
 
-    agent = Agent(
+    # Force initial navigation so the LLM isn't staring at about:blank.
+    # In browser-use 0.12, initial_actions run before the LLM loop kicks in.
+    effective_url = req.start_url or MERCHANT_HINTS.get(
+        req.merchant.lower().strip()
+    )
+    initial_actions = (
+        [{"go_to_url": {"url": effective_url, "new_tab": False}}]
+        if effective_url
+        else None
+    )
+
+    agent_kwargs = dict(
         task=_task_prompt(req.merchant, req.start_url),
         llm=llm,
         browser=browser,
     )
+    if initial_actions:
+        agent_kwargs["initial_actions"] = initial_actions
+        log.info("initial_action: go_to_url %s", effective_url)
+
+    agent = Agent(**agent_kwargs)
 
     try:
         history = await agent.run(max_steps=req.max_steps)
