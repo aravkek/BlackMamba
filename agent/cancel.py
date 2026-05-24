@@ -140,6 +140,43 @@ Rules:
     return base.strip()
 
 
+def _extract_step(item, fallback_index: int) -> CancelStep:
+    """Build a CancelStep from one browser-use history item. Defensive against
+    schema drift across browser-use minor versions."""
+    action_name = "step"
+    note: Optional[str] = None
+    url: Optional[str] = None
+    try:
+        model_output = getattr(item, "model_output", None)
+        if model_output is not None:
+            actions = getattr(model_output, "action", None) or []
+            names: List[str] = []
+            for a in actions:
+                if a is None:
+                    continue
+                try:
+                    d = a.model_dump(exclude_none=True)
+                    if d:
+                        names.append(next(iter(d.keys())))
+                except Exception:
+                    pass
+            if names:
+                action_name = ", ".join(names)
+        results = getattr(item, "result", None) or []
+        if results:
+            last = results[-1]
+            extracted = getattr(last, "extracted_content", None) or ""
+            note = extracted[:160] or None
+        state = getattr(item, "state", None)
+        if state is not None:
+            u = getattr(state, "url", None)
+            if u:
+                url = u
+    except Exception as parse_err:
+        log.debug("step parse fail: %s", parse_err)
+    return CancelStep(index=fallback_index, action=action_name, url=url, note=note)
+
+
 async def run_cancel_flow(req: CancelRequest) -> CancelResult:
     start = time.monotonic()
     steps: List[CancelStep] = []
@@ -208,40 +245,10 @@ async def run_cancel_flow(req: CancelRequest) -> CancelResult:
         # since they shift across minor versions.
         items = getattr(history, "history", None) or list(history)
         for i, item in enumerate(items):
-            action_name = "step"
-            note = None
-            url = None
-            try:
-                model_output = getattr(item, "model_output", None)
-                if model_output is not None:
-                    actions = getattr(model_output, "action", None) or []
-                    names: List[str] = []
-                    for a in actions:
-                        if a is None:
-                            continue
-                        try:
-                            d = a.model_dump(exclude_none=True)
-                            if d:
-                                names.append(next(iter(d.keys())))
-                        except Exception:
-                            pass
-                    if names:
-                        action_name = ", ".join(names)
-                results = getattr(item, "result", None) or []
-                if results:
-                    last = results[-1]
-                    extracted = getattr(last, "extracted_content", None) or ""
-                    note = extracted[:160] or None
-                state = getattr(item, "state", None)
-                if state is not None:
-                    u = getattr(state, "url", None)
-                    if u:
-                        url = u
-                        final_url = u
-            except Exception as parse_err:
-                log.debug("step parse fail: %s", parse_err)
-
-            steps.append(CancelStep(index=i, action=action_name, url=url, note=note))
+            step = _extract_step(item, i)
+            if step.url:
+                final_url = step.url
+            steps.append(step)
 
         # Determine success: look for is_done on the final result entry.
         is_done = False
@@ -253,6 +260,20 @@ async def run_cancel_flow(req: CancelRequest) -> CancelResult:
                     is_done = True
                     break
 
+        # Detect terminal "I gave up" signals the prompt told the LLM to emit.
+        # The LLM marks is_done=True with one of these phrases when it can't
+        # proceed (not logged in, CAPTCHA, 2FA, etc.). Surface as an error
+        # instead of a misleading success.
+        terminal_error: Optional[str] = None
+        last_note = (steps[-1].note or "").lower() if steps else ""
+        if "credentials_needed" in last_note:
+            terminal_error = "credentials_needed"
+        elif "human_action_required" in last_note:
+            terminal_error = "human_action_required"
+
+        if terminal_error is not None:
+            is_done = False
+
         duration_ms = int((time.monotonic() - start) * 1000)
         return CancelResult(
             success=is_done,
@@ -260,7 +281,11 @@ async def run_cancel_flow(req: CancelRequest) -> CancelResult:
             duration_ms=duration_ms,
             steps=steps,
             final_url=final_url,
-            error=None if is_done else "agent_did_not_signal_done",
+            error=(
+                terminal_error
+                if terminal_error is not None
+                else (None if is_done else "agent_did_not_signal_done")
+            ),
         )
 
     finally:
@@ -268,3 +293,136 @@ async def run_cancel_flow(req: CancelRequest) -> CancelResult:
             await browser.close()
         except Exception:
             pass
+
+
+async def run_cancel_flow_streaming(req: CancelRequest, job) -> None:
+    """Streaming variant — same flow as run_cancel_flow, but updates `job` as
+    each agent step completes so the UI can poll progress.
+
+    `job` is a jobs.Job (avoid the import cycle by typing it loosely).
+    """
+    # Local import to avoid a circular import at module load.
+    from jobs import get_lock
+
+    start = time.monotonic()
+    lock = get_lock(job.run_id)
+    job.status = "running"
+
+    try:
+        from browser_use import Agent, Browser, BrowserProfile
+    except ImportError as e:
+        job.status = "failed"
+        job.error = f"browser_use_import_failed: {e}"
+        job.finished_at = time.time()
+        return
+
+    provider, llm = _pick_llm()
+    log.info("[stream %s] running cancel for %s via %s", job.run_id, req.merchant, provider)
+
+    chrome_path = os.getenv(
+        "CHROME_BINARY_PATH",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    )
+    profile_dir = os.path.expanduser(
+        os.getenv("CHROME_PROFILE_DIR", "~/.blackmamba/chrome-profile")
+    )
+    os.makedirs(profile_dir, exist_ok=True)
+
+    profile = BrowserProfile(
+        executable_path=chrome_path,
+        user_data_dir=profile_dir,
+        headless=req.headless,
+        keep_alive=False,
+    )
+    browser = Browser(browser_profile=profile)
+
+    effective_url = req.start_url or MERCHANT_HINTS.get(req.merchant.lower().strip())
+    initial_actions = (
+        [{"navigate": {"url": effective_url, "new_tab": False}}]
+        if effective_url
+        else None
+    )
+
+    async def on_step_end(agent_inst) -> None:
+        """Append the latest history item to the job.
+
+        In browser-use 0.12 the history lives at agent.history (AgentHistoryList),
+        whose .history is the list of AgentHistory items.
+        """
+        if lock is None:
+            return
+        try:
+            history = getattr(agent_inst, "history", None)
+            items = getattr(history, "history", None) if history is not None else None
+            if not items:
+                return
+            latest = items[-1]
+            async with lock:
+                idx = len(job.steps)
+                step = _extract_step(latest, idx)
+                job.steps.append(step)
+                if step.url:
+                    job.final_url = step.url
+        except Exception as e:
+            log.debug("[stream %s] on_step_end parse fail: %s", job.run_id, e)
+
+    agent_kwargs = dict(
+        task=_task_prompt(req.merchant, req.start_url),
+        llm=llm,
+        browser=browser,
+    )
+    if initial_actions:
+        agent_kwargs["initial_actions"] = initial_actions
+
+    agent = Agent(**agent_kwargs)
+
+    try:
+        history = await agent.run(max_steps=req.max_steps, on_step_end=on_step_end)
+
+        # Determine is_done from the final history entry.
+        items = getattr(history, "history", None) or list(history)
+        is_done = False
+        if items:
+            last = items[-1]
+            last_results = getattr(last, "result", None) or []
+            for r in last_results:
+                if getattr(r, "is_done", False):
+                    is_done = True
+                    break
+
+        terminal_error: Optional[str] = None
+        if lock is not None:
+            async with lock:
+                last_note = (job.steps[-1].note or "").lower() if job.steps else ""
+        else:
+            last_note = ""
+        if "credentials_needed" in last_note:
+            terminal_error = "credentials_needed"
+            is_done = False
+        elif "human_action_required" in last_note:
+            terminal_error = "human_action_required"
+            is_done = False
+
+        if lock is not None:
+            async with lock:
+                job.status = "success" if is_done else "failed"
+                job.error = (
+                    terminal_error
+                    if terminal_error is not None
+                    else (None if is_done else "agent_did_not_signal_done")
+                )
+                job.finished_at = time.time()
+
+    except Exception as e:
+        log.exception("[stream %s] agent run failed", job.run_id)
+        if lock is not None:
+            async with lock:
+                job.status = "failed"
+                job.error = f"agent_exception: {e}"
+                job.finished_at = time.time()
+    finally:
+        try:
+            await browser.close()
+        except Exception:
+            pass
+        log.info("[stream %s] done in %dms", job.run_id, int((time.monotonic() - start) * 1000))

@@ -23,7 +23,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from cancel import CancelRequest, CancelResult, run_cancel_flow
+from cancel import CancelRequest, CancelResult, run_cancel_flow, run_cancel_flow_streaming
+from jobs import JobResponse, create_job, get_job
 
 load_dotenv()
 
@@ -99,6 +100,35 @@ async def health() -> HealthResponse:
         llm_provider=provider,
         has_llm_key=True,
     )
+
+
+class StartCancelResponse(BaseModel):
+    run_id: str
+    merchant: str
+
+
+@app.post("/cancel/start", response_model=StartCancelResponse)
+async def cancel_start(body: CancelBody) -> StartCancelResponse:
+    """Fire-and-forget: kick off the cancel run, return a run_id immediately."""
+    log.info("cancel/start: merchant=%s", body.merchant)
+    job = create_job(merchant=body.merchant)
+    req = CancelRequest(
+        merchant=body.merchant,
+        start_url=body.url,
+        headless=body.headless,
+        max_steps=body.max_steps,
+    )
+    # Background task — don't await it here.
+    asyncio.create_task(run_cancel_flow_streaming(req, job))
+    return StartCancelResponse(run_id=job.run_id, merchant=job.merchant)
+
+
+@app.get("/cancel/runs/{run_id}", response_model=JobResponse)
+async def cancel_run_state(run_id: str) -> JobResponse:
+    job = get_job(run_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="run_not_found")
+    return job.to_response()
 
 
 @app.post("/cancel", response_model=CancelResult)
