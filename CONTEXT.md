@@ -1,4 +1,4 @@
-# Switchback — Build Context for Aarya + Zain
+# BlackMamba — Build Context for Aarya + Zain
 
 **Hackathon:** TechTO Hackathon, Toronto, May 24 2026. Submit by ~5pm.
 **Sponsors integrated:** Tangerine (Plaid framing), ElevenLabs (Aria voice), Backboard.io (agent brain), Codalio (credit), Rootly.ai (failure-recovery narrative).
@@ -8,6 +8,16 @@
 A subscription manager where every subscription gets its own virtual card. Cancel = revoke. No retention dark patterns, no forgotten trials. Voice-driven via ElevenLabs.
 
 **Tagline:** "The cancel button is the most valuable second in a subscriber's life. Nobody auctions it. We do."
+
+## Status (live)
+
+- ✅ Agent service running on `:8001`, browser-use v0.12.8, real Chrome with `~/.blackmamba/chrome-profile` (separate from your real Chrome)
+- ✅ Backboard wired as LLM (`{has_llm_key: true, llm_provider: backboard}`)
+- ✅ Dashboard wired, `next build` passes, all 6 subs render (Substack swapped in for Notion)
+- ✅ Smoke test passed: real Chrome launched, agent ran 5 steps on example.com in 46s
+- 🔄 Phase 2 in flight: wiring `VirtualCardReveal` modal to fire on cancel success (frontend agent ~25min)
+- ⏳ Live cancel test target: **Substack** (free signup, hostile unsubscribe maze — relatable)
+- ⏳ Aarya's statement-ingestion plan (`docs/superpowers/plans/...`) is v2 — acknowledged, not in scope for 5pm submit
 
 ## Aarya's archived BlackMamba plans — what we borrow
 
