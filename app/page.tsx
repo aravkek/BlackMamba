@@ -179,7 +179,7 @@ function Header() {
       <div className="mx-auto w-full max-w-6xl px-6 sm:px-10 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <BrandMark id="tangerine" size={26} />
-          <span className="display text-[18px] tracking-tight">SWITCHBACK</span>
+          <span className="display text-[18px] tracking-tight">BLACKMAMBA</span>
         </div>
         <div className="hidden md:block text-[12px] text-[#8a8a8a] max-w-md text-right leading-snug">
           Every cancel is an auction. Every subscription a revocable card.

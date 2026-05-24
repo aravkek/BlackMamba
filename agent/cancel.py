@@ -1,9 +1,9 @@
 """
-Browser-Use cancel-flow runner.
+Browser-Use cancel-flow runner (browser-use v0.12.x API).
 
-Given a merchant name (and optionally a start URL), drive a headed browser
-through the subscription cancellation flow. We prefer OpenAI gpt-4o-mini for
-cost/latency; falls back to Anthropic or Google if the OpenAI key is missing.
+Given a merchant name (and optionally a start URL), drive the user's real
+Chrome through the subscription cancellation flow. Uses Backboard as the
+LLM by default (OpenAI-compatible endpoint).
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-log = logging.getLogger("switchback.cancel")
+log = logging.getLogger("blackmamba.cancel")
 
 
 @dataclass
@@ -44,7 +44,7 @@ class CancelResult(BaseModel):
 
 
 def _pick_llm():
-    """Return a (provider_name, langchain LLM) tuple based on available keys.
+    """Return (provider_name, llm) using browser-use's native chat classes.
 
     Priority:
     1. Backboard (sponsor, OpenAI-compatible) — set BACKBOARD_API_KEY
@@ -52,45 +52,37 @@ def _pick_llm():
     3. Anthropic
     4. Google
     """
-    # Backboard: OpenAI-compatible endpoint, so route the OpenAI client there.
-    if os.getenv("BACKBOARD_API_KEY"):
-        from langchain_openai import ChatOpenAI
+    from browser_use import ChatAnthropic, ChatGoogle, ChatOpenAI
 
+    if os.getenv("BACKBOARD_API_KEY"):
         base = os.getenv("BACKBOARD_BASE_URL", "https://api.backboard.io/v1")
-        # Backboard exposes /v1/chat/completions, langchain_openai appends /chat/completions
-        # so base_url must end at /v1.
         if not base.rstrip("/").endswith("/v1"):
             base = base.rstrip("/") + "/v1"
         model = os.getenv("BACKBOARD_MODEL", "gpt-4o-mini")
         return "backboard", ChatOpenAI(
             model=model,
-            temperature=0.0,
-            api_key=os.environ["BACKBOARD_API_KEY"],
             base_url=base,
+            api_key=os.environ["BACKBOARD_API_KEY"],
+            temperature=0.0,
         )
     if os.getenv("OPENAI_API_KEY"):
-        from langchain_openai import ChatOpenAI
-
         return "openai", ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
     if os.getenv("ANTHROPIC_API_KEY"):
-        from langchain_anthropic import ChatAnthropic
-
         return "anthropic", ChatAnthropic(
             model="claude-haiku-4-5-20251001", temperature=0.0
         )
     if os.getenv("GOOGLE_API_KEY"):
-        from langchain_google_genai import ChatGoogleGenerativeAI
-
-        return "google", ChatGoogleGenerativeAI(
+        return "google", ChatGoogle(
             model="gemini-2.0-flash-exp", temperature=0.0
         )
     raise RuntimeError(
-        "no_llm_key: set one of BACKBOARD_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY"
+        "no_llm_key: set one of BACKBOARD_API_KEY, OPENAI_API_KEY, "
+        "ANTHROPIC_API_KEY, GOOGLE_API_KEY"
     )
 
 
 def _task_prompt(merchant: str, start_url: Optional[str]) -> str:
-    base = f"""You are Switchback, an AI agent that cancels subscriptions on behalf of the user.
+    base = f"""You are BlackMamba, an AI agent that cancels subscriptions on behalf of the user.
 
 GOAL: Cancel the user's {merchant} subscription.
 
@@ -118,61 +110,91 @@ async def run_cancel_flow(req: CancelRequest) -> CancelResult:
     final_url: Optional[str] = None
 
     try:
-        from browser_use import Agent, Browser, BrowserConfig
+        from browser_use import Agent, Browser, BrowserProfile
     except ImportError as e:
-        raise RuntimeError(
-            f"browser-use not installed in this venv: {e}"
-        ) from e
+        raise RuntimeError(f"browser-use not importable in this venv: {e}") from e
 
     provider, llm = _pick_llm()
     log.info("running cancel for %s via %s", req.merchant, provider)
 
-    browser = Browser(
-        config=BrowserConfig(
-            headless=req.headless,
-        )
+    # Use the user's installed Chrome (not Playwright's bundled Chromium) so
+    # cookies/logins/2FA from prior sessions are available. Use a SEPARATE
+    # BlackMamba profile dir so we never collide with a running Chrome
+    # instance. The demoer logs into NYTimes/Spotify into this profile ONCE
+    # before the demo and the agent reuses it forever.
+    chrome_path = os.getenv(
+        "CHROME_BINARY_PATH",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     )
+    profile_dir = os.path.expanduser(
+        os.getenv("CHROME_PROFILE_DIR", "~/.blackmamba/chrome-profile")
+    )
+    os.makedirs(profile_dir, exist_ok=True)
+    log.info("launching chrome: binary=%s profile=%s", chrome_path, profile_dir)
+
+    profile = BrowserProfile(
+        executable_path=chrome_path,
+        user_data_dir=profile_dir,
+        headless=req.headless,
+        keep_alive=False,
+    )
+
+    browser = Browser(browser_profile=profile)
 
     agent = Agent(
         task=_task_prompt(req.merchant, req.start_url),
         llm=llm,
         browser=browser,
-        max_failures=3,
     )
 
     try:
         history = await agent.run(max_steps=req.max_steps)
 
-        for i, item in enumerate(history.history):
-            action = "step"
+        # v0.12 AgentHistoryList iteration — be defensive about field shapes
+        # since they shift across minor versions.
+        items = getattr(history, "history", None) or list(history)
+        for i, item in enumerate(items):
+            action_name = "step"
             note = None
             url = None
             try:
-                if item.model_output and item.model_output.action:
-                    action = ", ".join(
-                        str(list(a.model_dump().keys())[0])
-                        for a in item.model_output.action
-                        if a
-                    )
-                if item.result and item.result:
-                    last = item.result[-1] if item.result else None
-                    if last:
-                        note = (last.extracted_content or "")[:160] or None
-                if item.state:
-                    url = getattr(item.state, "url", None)
-                    if url:
-                        final_url = url
+                model_output = getattr(item, "model_output", None)
+                if model_output is not None:
+                    actions = getattr(model_output, "action", None) or []
+                    names: List[str] = []
+                    for a in actions:
+                        if a is None:
+                            continue
+                        try:
+                            d = a.model_dump(exclude_none=True)
+                            if d:
+                                names.append(next(iter(d.keys())))
+                        except Exception:
+                            pass
+                    if names:
+                        action_name = ", ".join(names)
+                results = getattr(item, "result", None) or []
+                if results:
+                    last = results[-1]
+                    extracted = getattr(last, "extracted_content", None) or ""
+                    note = extracted[:160] or None
+                state = getattr(item, "state", None)
+                if state is not None:
+                    u = getattr(state, "url", None)
+                    if u:
+                        url = u
+                        final_url = u
             except Exception as parse_err:
                 log.debug("step parse fail: %s", parse_err)
 
-            steps.append(CancelStep(index=i, action=action, url=url, note=note))
+            steps.append(CancelStep(index=i, action=action_name, url=url, note=note))
 
-        # Browser-Use marks done() to signal completion. Look for an is_done flag
-        # on the last result; otherwise assume failure.
+        # Determine success: look for is_done on the final result entry.
         is_done = False
-        if history.history:
-            last = history.history[-1]
-            for r in (last.result or []):
+        if items:
+            last = items[-1]
+            last_results = getattr(last, "result", None) or []
+            for r in last_results:
                 if getattr(r, "is_done", False):
                     is_done = True
                     break

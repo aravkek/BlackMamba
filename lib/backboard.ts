@@ -45,7 +45,7 @@ export async function generateSwitchMessage(
       {
         role: "system",
         content:
-          "You are Switchback, a calm financial assistant. Reply in one or two short sentences. " +
+          "You are BlackMamba, a calm financial assistant. Reply in one or two short sentences. " +
           "Confirm the action concretely. No emojis. No hashtags.",
       },
       { role: "user", content: userPrompt },

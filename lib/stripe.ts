@@ -1,4 +1,4 @@
-// Stripe client + cardholder bootstrap for Switchback.
+// Stripe client + cardholder bootstrap for BlackMamba.
 // Lazy-initialized so the module can be imported even without a key
 // (the /api/cards route returns a mock card in that case).
 
@@ -34,7 +34,7 @@ export async function getOrCreateCardholder(): Promise<string> {
 
     const cardholder = await stripe.issuing.cardholders.create({
       type: "individual",
-      name: "Switchback Demo",
+      name: "BlackMamba Demo",
       email: "demo@switchback.app",
       phone_number: "+14165550100",
       status: "active",

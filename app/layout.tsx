@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Switchback — the cancel button is the most valuable second",
+  title: "BlackMamba — the cancel button is the most valuable second",
   description:
     "Every subscription is a revocable virtual card. Click cancel, the card dies, the merchant can never charge again.",
 };
