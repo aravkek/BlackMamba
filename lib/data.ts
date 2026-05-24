@@ -1,3 +1,5 @@
+export type LastCharge = { date: string; amount: number; source: string };
+
 export type Subscription = {
   id: string;
   service: string;
@@ -8,6 +10,12 @@ export type Subscription = {
   accentText?: string;
   /** human note shown under cost */
   note?: string;
+  /** Set by statement ingestion when a matching bank charge is found. */
+  lastCharge?: LastCharge;
+  /** True when this row was added from a statement (not in the seed list). */
+  detectedFromStatement?: boolean;
+  /** True when the most recent charge looks like a $0.01/$1.00 trial verify. */
+  isTrialVerify?: boolean;
 };
 
 export const SUBSCRIPTIONS: Subscription[] = [
