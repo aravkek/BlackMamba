@@ -3,3 +3,4 @@ export * from "./ChatThread";
 export * from "./ChatComposer";
 export * from "./MessageBubble";
 export * from "./ToolInvocation";
+export * from "./SubscriptionRail";
