@@ -6,9 +6,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AnimatedCounter } from "@/components/AnimatedCounter";
 import { BrandMark } from "@/components/BrandMark";
 import { SubscriptionCard } from "@/components/SubscriptionCard";
+import { UploadModal } from "@/components/UploadModal";
 import { Button } from "@/components/ui/Button";
 import { VirtualCardReveal } from "@/components/VirtualCardReveal";
-import { SUBSCRIPTIONS, YEARLY_AT_STAKE, type Subscription } from "@/lib/data";
+import { SUBSCRIPTIONS, type Subscription } from "@/lib/data";
 
 type AgentStep = {
   index: number;
@@ -50,6 +51,29 @@ type RevealRequest = {
 };
 
 export default function HomePage() {
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>(SUBSCRIPTIONS);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+
+  // Fetch live subscription list on mount, and after a successful upload.
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/subscriptions");
+      if (!res.ok) return;
+      let data: unknown = null;
+      try { data = await res.json(); } catch { data = null; }
+      if (data && typeof data === "object" && "subscriptions" in data) {
+        const payload = data as { subscriptions: Subscription[] };
+        if (Array.isArray(payload.subscriptions)) {
+          setSubscriptions(payload.subscriptions);
+        }
+      }
+    } catch {
+      // silently keep the seeded list on network failure
+    }
+  }, []);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
   const [savings, setSavings] = useState(0);
   const [cardStates, setCardStates] = useState<Record<string, CardState>>(() =>
     Object.fromEntries(SUBSCRIPTIONS.map((s) => [s.id, { kind: "idle" }])),
@@ -66,6 +90,18 @@ export default function HomePage() {
   const [reveal, setReveal] = useState<RevealRequest | null>(null);
   const revealCounter = useRef(0);
 
+  // When the subscriptions list grows (e.g. after statement upload), ensure
+  // newly-arrived ids get an idle card state so they render correctly.
+  useEffect(() => {
+    setCardStates((prev) => {
+      const additions = subscriptions
+        .filter((s) => !(s.id in prev))
+        .map((s): [string, CardState] => [s.id, { kind: "idle" }]);
+      if (additions.length === 0) return prev;
+      return { ...prev, ...Object.fromEntries(additions) };
+    });
+  }, [subscriptions]);
+
   const closeReveal = useCallback(() => setReveal(null), []);
 
   // Escape closes the overlay. Listener is cheap; only active when mounted.
@@ -78,7 +114,13 @@ export default function HomePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [reveal, closeReveal]);
 
-  const yearlyAtStake = useMemo(() => Math.round(YEARLY_AT_STAKE), []);
+  const yearlyAtStake = useMemo(
+    () => Math.round(subscriptions.reduce(
+      (sum, s) => sum + s.amount * (s.frequency === "monthly" ? 12 : 1),
+      0,
+    )),
+    [subscriptions],
+  );
 
   const handleCancel = useCallback(
     async (sub: Subscription) => {
@@ -173,28 +215,28 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen w-full bg-[#0a0a0a] text-[#ededed]">
-      <Header />
+      <Header onUploadClick={() => setUploadModalOpen(true)} />
 
       <main className="mx-auto w-full max-w-6xl px-6 sm:px-10 pb-24">
-        <AtStake savings={savings} yearlyAtStake={yearlyAtStake} />
+        <AtStake savings={savings} yearlyAtStake={yearlyAtStake} subscriptionCount={subscriptions.length} />
 
         <section className="mt-14">
           <div className="flex items-end justify-between mb-6">
             <div>
               <div className="eyebrow">Active subscriptions</div>
               <h2 className="display text-2xl sm:text-3xl mt-2">
-                Six cards. Six cancel buttons.
+                Cards. Cancel buttons.
               </h2>
             </div>
             <div className="hidden sm:block text-[12px] text-[#8a8a8a] mono">
-              {SUBSCRIPTIONS.length} live · 0 cancelled
+              {subscriptions.length} live · 0 cancelled
             </div>
           </div>
 
           <div className="hairline mb-6" />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {SUBSCRIPTIONS.map((sub) => {
+            {subscriptions.map((sub) => {
               const state = cardStates[sub.id] ?? { kind: "idle" };
               return (
                 <CancellableRow
@@ -224,20 +266,34 @@ export default function HomePage() {
         limit={reveal?.limit ?? 0}
         onClose={closeReveal}
       />
+
+      <UploadModal
+        open={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onSuccess={() => {
+          setUploadModalOpen(false);
+          void refresh();
+        }}
+      />
     </div>
   );
 }
 
-function Header() {
+function Header({ onUploadClick }: { onUploadClick: () => void }) {
   return (
     <header className="border-b border-[#262626]">
-      <div className="mx-auto w-full max-w-6xl px-6 sm:px-10 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="mx-auto w-full max-w-6xl px-6 sm:px-10 py-5 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 shrink-0">
           <BrandMark id="tangerine" size={26} />
           <span className="display text-[18px] tracking-tight">BLACKMAMBA</span>
         </div>
-        <div className="hidden md:block text-[12px] text-[#8a8a8a] max-w-md text-right leading-snug">
-          Every cancel is an auction. Every subscription a revocable card.
+        <div className="flex items-center gap-4">
+          <div className="hidden md:block text-[12px] text-[#8a8a8a] max-w-md text-right leading-snug">
+            Every cancel is an auction. Every subscription a revocable card.
+          </div>
+          <Button variant="secondary" size="sm" onClick={onUploadClick}>
+            Upload statement
+          </Button>
         </div>
       </div>
     </header>
@@ -247,9 +303,11 @@ function Header() {
 function AtStake({
   savings,
   yearlyAtStake,
+  subscriptionCount,
 }: {
   savings: number;
   yearlyAtStake: number;
+  subscriptionCount: number;
 }) {
   return (
     <section className="pt-16 sm:pt-24">
@@ -278,7 +336,7 @@ function AtStake({
         </div>
         <span className="text-[#3a3a3a]">·</span>
         <span className="text-[#8a8a8a] text-[12px] mono">
-          {SUBSCRIPTIONS.length} merchants tracked
+          {subscriptionCount} merchants tracked
         </span>
       </div>
     </section>
