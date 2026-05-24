@@ -81,25 +81,43 @@ def _pick_llm():
     )
 
 
+# Per-merchant cancel URL hints so the agent doesn't waste steps hunting
+# for the billing page. Add entries here as we learn merchant flows.
+MERCHANT_HINTS: dict[str, str] = {
+    "nytimes": "https://www.nytimes.com/account",
+    "new york times": "https://www.nytimes.com/account",
+    "spotify": "https://www.spotify.com/account/subscription/",
+    "netflix": "https://www.netflix.com/account",
+    "disney+": "https://www.disneyplus.com/account/subscription",
+    "substack": "https://substack.com/account",
+    "goodlife": "https://www.goodlifefitness.com/member-portal/account.html",
+    "amazon prime": "https://www.amazon.com/gp/help/customer/display.html?nodeId=GMFEGZJSYU2VMVZL",
+}
+
+
 def _task_prompt(merchant: str, start_url: Optional[str]) -> str:
+    # Prefer the explicit start_url; otherwise use a known merchant hint.
+    effective_start = start_url or MERCHANT_HINTS.get(merchant.lower().strip())
+
     base = f"""You are BlackMamba, an AI agent that cancels subscriptions on behalf of the user.
 
 GOAL: Cancel the user's {merchant} subscription.
 
 Instructions:
-1. {"Navigate to " + start_url if start_url else f"Find the {merchant} login or account page."}
-2. If a login is required and credentials are not pre-filled, stop and report "credentials_needed".
-3. Locate the account / billing / subscription / membership settings page.
-4. Find the cancel-subscription option. It may be hidden behind "manage plan", "membership", or similar.
-5. Click cancel and confirm the cancellation through any retention prompts. Decline ALL offers to stay.
-6. Wait for the final confirmation screen ("your subscription has been cancelled" or equivalent).
-7. Report success.
+1. {"Navigate directly to " + effective_start if effective_start else f"Find the {merchant} login or account page."}
+2. If you are NOT already logged in (you see a login form), stop and report "credentials_needed". The user is supposed to be logged in already in this Chrome profile.
+3. Once on the account page, locate the subscription / billing / membership / plan section. For {merchant} specifically, look for links like "Manage subscription", "Cancel subscription", "Billing", or "Plan".
+4. Click the cancel option. Read the page carefully — companies hide cancel behind "manage plan" or "downgrade".
+5. Decline ALL retention offers ("wait, here's 50% off", "pause instead", "downgrade"). The user wants to fully cancel.
+6. Confirm the cancellation through every prompt. Click "Confirm cancellation" / "Yes, cancel" / "I'm sure" repeatedly until you reach the final confirmation page.
+7. Wait for a page that says your subscription has been cancelled (or will end on <date>). Then report success.
 
 Rules:
 - Never input payment information.
 - Never accept a counter-offer to stay subscribed.
-- If you encounter a CAPTCHA or 2FA you cannot solve, stop and report "human_action_required".
-- Be efficient: max 40 steps.
+- If you encounter a CAPTCHA, stop and report "human_action_required".
+- If 2FA is requested, stop and report "human_action_required".
+- Be efficient: aim to finish in under 25 steps.
 """
     return base.strip()
 
