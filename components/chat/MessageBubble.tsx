@@ -27,15 +27,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     <div className="mt-8">
       {/* Role + timestamp eyebrow */}
       <div className="flex items-baseline gap-1.5 mb-2">
-        <span className="mono text-[10px] uppercase tracking-widest text-[#5a5a5f]">
+        <span className="mono text-[10px] uppercase tracking-widest text-[color:var(--fg-dim)]">
           {roleLabel}
         </span>
-        <span className="mono text-[10px] text-[#5a5a5f]">&middot;</span>
-        <span className="mono text-[10px] text-[#5a5a5f]">{time}</span>
+        <span className="mono text-[10px] text-[color:var(--fg-dim)]">&middot;</span>
+        <span className="mono text-[10px] text-[color:var(--fg-dim)]">{time}</span>
       </div>
 
       {/* Message content */}
-      <p className="text-[15px] text-[#ededed] leading-relaxed whitespace-pre-wrap">
+      <p className="text-[15px] text-[color:var(--fg)] leading-relaxed whitespace-pre-wrap">
         {content}
       </p>
 

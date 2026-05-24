@@ -23,7 +23,7 @@ function PendingDots() {
   return (
     <div className="mt-8" role="status" aria-label="Aria is responding">
       <div className="flex items-baseline gap-1.5 mb-2">
-        <span className="mono text-[10px] uppercase tracking-widest text-[#5a5a5f]">
+        <span className="mono text-[10px] uppercase tracking-widest text-[color:var(--fg-dim)]">
           aria
         </span>
       </div>
@@ -54,10 +54,10 @@ function PendingDots() {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center h-full">
-      <h1 className="serif text-6xl text-[#ededed] tracking-tight">
+      <h1 className="serif text-6xl text-[color:var(--fg)] tracking-tight">
         Switchback.
       </h1>
-      <p className="mt-4 mono text-xs uppercase tracking-widest text-[#5a5a5f]">
+      <p className="mt-4 mono text-xs uppercase tracking-widest text-[color:var(--fg-dim)]">
         cancel &middot; classify &middot; audit
       </p>
     </div>
