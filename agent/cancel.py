@@ -164,8 +164,10 @@ async def run_cancel_flow(req: CancelRequest) -> CancelResult:
     effective_url = req.start_url or MERCHANT_HINTS.get(
         req.merchant.lower().strip()
     )
+    # browser-use 0.12 action is `navigate` (not `go_to_url`). See
+    # .venv/.../browser_use/agent/service.py:459 for the default-built example.
     initial_actions = (
-        [{"go_to_url": {"url": effective_url, "new_tab": False}}]
+        [{"navigate": {"url": effective_url, "new_tab": False}}]
         if effective_url
         else None
     )
