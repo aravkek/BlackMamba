@@ -211,12 +211,12 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
         animate={{ y: 0, scale: 1, opacity: 1 }}
         exit={{ y: 10, scale: 0.98, opacity: 0 }}
         transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
-        className="relative w-full max-w-xl bg-[#0d0d0d] border border-[#262626] rounded-2xl p-8"
+        className="relative w-full max-w-xl bg-[color:var(--surface)] border border-[color:var(--border)] rounded-2xl p-8"
         onClick={(e) => e.stopPropagation()}
       >
             {/* Header */}
             <div className="mb-6">
-              <div className="eyebrow text-[#F38B00] mb-3">
+              <div className="eyebrow text-[color:var(--tangerine)] mb-3">
                 STATEMENT UPLOAD
               </div>
               <h2
@@ -225,7 +225,7 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
               >
                 Show us what you&apos;re paying.
               </h2>
-              <p className="text-[14px] text-[#8a8a8a] mt-2 leading-snug">
+              <p className="text-[14px] text-[color:var(--fg-muted)] mt-2 leading-snug">
                 CSV parses instantly. PDF goes through Aria — adds ~20s per file.
               </p>
             </div>
@@ -250,10 +250,10 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                     className={[
                       "flex items-center justify-center rounded-xl border border-dashed px-6 py-10 cursor-pointer",
                       "transition-colors duration-200 outline-none",
-                      "focus-visible:ring-2 focus-visible:ring-[#F38B00]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d0d]",
+                      "focus-visible:ring-2 focus-visible:ring-[color:var(--tangerine)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]",
                       dragOver
-                        ? "border-[#F38B00] bg-[#F38B00]/5"
-                        : "border-[#3a3a3a] hover:border-[#F38B00] bg-transparent",
+                        ? "border-[color:var(--tangerine)] bg-[color:var(--tangerine)]/10"
+                        : "border-[color:var(--border-strong)] hover:border-[color:var(--tangerine)] bg-transparent",
                     ].join(" ")}
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
@@ -266,11 +266,11 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                       }
                     }}
                   >
-                    <span className="mono text-[13px] text-[#555] select-none">
+                    <span className="mono text-[13px] text-[color:var(--fg-dim)] select-none">
                       drop files here · or click to browse
                     </span>
                   </div>
-                  <p className="mt-2 text-[11px] text-[#555] mono">
+                  <p className="mt-2 text-[11px] text-[color:var(--fg-dim)] mono">
                     .csv · .pdf · multi-file supported
                   </p>
                 </motion.div>
@@ -289,7 +289,7 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                   className="overflow-hidden"
                 >
                   <ul
-                    className="divide-y divide-[#1a1a1a]"
+                    className="divide-y divide-[color:var(--border)]"
                     aria-label="Staged files"
                   >
                     {files.map((f) => (
@@ -297,11 +297,11 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                         key={f.name}
                         className="flex items-center justify-between gap-4 py-2.5"
                       >
-                        <span className="mono text-[13px] text-[#ededed] truncate min-w-0">
+                        <span className="mono text-[13px] text-[color:var(--fg)] truncate min-w-0">
                           {f.name}
                         </span>
                         <div className="flex items-center gap-3 shrink-0">
-                          <span className="mono text-[12px] text-[#555]">
+                          <span className="mono text-[12px] text-[color:var(--fg-dim)]">
                             {formatBytes(f.size)}
                           </span>
                           {!isUploading && (
@@ -309,7 +309,7 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                               type="button"
                               aria-label={`Remove ${f.name}`}
                               onClick={() => removeFile(f.name)}
-                              className="text-[#555] hover:text-[#ff8a8a] transition-colors text-[13px] mono leading-none"
+                              className="text-[color:var(--fg-dim)] hover:text-[#ef4444] transition-colors text-[13px] mono leading-none"
                             >
                               ×
                             </button>
@@ -328,10 +328,10 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                       className={[
                         "mt-3 flex items-center justify-center rounded-lg border border-dashed px-4 py-3 cursor-pointer",
                         "transition-colors duration-200 outline-none",
-                        "focus-visible:ring-2 focus-visible:ring-[#F38B00]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d0d]",
+                        "focus-visible:ring-2 focus-visible:ring-[color:var(--tangerine)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]",
                         dragOver
-                          ? "border-[#F38B00] bg-[#F38B00]/5"
-                          : "border-[#3a3a3a] hover:border-[#F38B00]",
+                          ? "border-[color:var(--tangerine)] bg-[color:var(--tangerine)]/10"
+                          : "border-[color:var(--border-strong)] hover:border-[color:var(--tangerine)]",
                       ].join(" ")}
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
@@ -344,7 +344,7 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                         }
                       }}
                     >
-                      <span className="mono text-[12px] text-[#555] select-none">
+                      <span className="mono text-[12px] text-[color:var(--fg-dim)] select-none">
                         + add more files
                       </span>
                     </div>
@@ -367,31 +367,31 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                   aria-live="polite"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="mono text-[11px] uppercase tracking-widest text-[#8a8a8a]">
+                    <span className="mono text-[11px] uppercase tracking-widest text-[color:var(--fg-muted)]">
                       Parsing statement
                     </span>
                     <span
-                      className="mono text-[11px] text-[#ededed] tabular-nums"
+                      className="mono text-[11px] text-[color:var(--fg)] tabular-nums"
                       aria-label={`${Math.round(progress)} percent complete`}
                     >
                       {Math.round(progress)}%
                     </span>
                   </div>
                   <div
-                    className="h-1.5 w-full rounded-full bg-[#1a1a1a] overflow-hidden"
+                    className="h-1.5 w-full rounded-full bg-[color:var(--surface-3)] overflow-hidden"
                     role="progressbar"
                     aria-valuenow={Math.round(progress)}
                     aria-valuemin={0}
                     aria-valuemax={100}
                   >
                     <motion.div
-                      className="h-full bg-[#F38B00] rounded-full"
+                      className="h-full bg-[color:var(--tangerine)] rounded-full"
                       initial={false}
                       animate={{ width: `${progress}%` }}
                       transition={{ duration: 0.18, ease: "easeOut" }}
                     />
                   </div>
-                  <p className="mt-2 text-[11px] text-[#5a5a5f] mono">
+                  <p className="mt-2 text-[11px] text-[color:var(--fg-dim)] mono">
                     {files.some((f) => f.name.toLowerCase().endsWith(".pdf"))
                       ? "PDFs go through Aria — this may take ~20s per file."
                       : "Parsing locally — should be quick."}
@@ -411,7 +411,7 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                   transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
                 >
                   <ul
-                    className="divide-y divide-[#1a1a1a]"
+                    className="divide-y divide-[color:var(--border)]"
                     aria-label="Upload results"
                   >
                     {results.map((r) => (
@@ -419,13 +419,13 @@ function UploadModalBody({ onClose, onSuccess }: BodyProps) {
                         key={r.filename}
                         className="flex items-start justify-between gap-6 py-3"
                       >
-                        <span className="mono text-[13px] text-[#ededed] truncate min-w-0 shrink">
+                        <span className="mono text-[13px] text-[color:var(--fg)] truncate min-w-0 shrink">
                           {r.filename}
                         </span>
                         <span
                           className={[
                             "mono text-[12px] text-right shrink-0",
-                            r.error ? "text-[#ff8a8a]" : "text-[#10b981]",
+                            r.error ? "text-[#ef4444]" : "text-[#10b981]",
                           ].join(" ")}
                         >
                           {r.error
