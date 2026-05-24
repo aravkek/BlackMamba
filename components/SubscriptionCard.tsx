@@ -15,6 +15,17 @@ type Props = {
 export function SubscriptionCard({ sub, state = "active", onCancel }: Props) {
   const isCancelled = state === "cancelled";
   const isReplaced = state === "replaced";
+  const isDiscovered = sub.detectedFromStatement === true;
+
+  const lastChargeDisplay = sub.lastCharge
+    ? {
+        amount: `$${sub.lastCharge.amount.toFixed(2)}`,
+        date: sub.lastCharge.date.slice(5).replace("-", "/"),
+      }
+    : null;
+
+  const liveDotColor = sub.isTrialVerify ? "#F38B00" : "#10b981";
+  const liveTextColor = sub.isTrialVerify ? "#F38B00" : "#10b981";
 
   return (
     <motion.div
@@ -53,6 +64,11 @@ export function SubscriptionCard({ sub, state = "active", onCancel }: Props) {
                   Switched
                 </span>
               )}
+              {isDiscovered && !isCancelled && !isReplaced && (
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-[#F38B00] border border-[#3a2200] bg-[#1a0f00] px-1.5 py-0.5 rounded">
+                  Discovered
+                </span>
+              )}
             </div>
             {sub.note && (
               <div className="text-[11px] text-[#8a8a8a] mt-0.5 truncate">
@@ -74,11 +90,22 @@ export function SubscriptionCard({ sub, state = "active", onCancel }: Props) {
 
       <div className="mt-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[11px] text-[#555]">
-          <span className="mono">card · •• {hashLast4(sub.id)}</span>
+          <span className="mono">
+            card · •• {hashLast4(sub.id)}
+            {lastChargeDisplay && (
+              <> · last {lastChargeDisplay.amount} · {lastChargeDisplay.date}</>
+            )}
+          </span>
           {!isCancelled && (
             <span className="inline-flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-[#10b981] live-dot" />
-              <span className="uppercase tracking-widest text-[10px] text-[#10b981]">
+              <span
+                className="w-1 h-1 rounded-full live-dot"
+                style={{ background: liveDotColor }}
+              />
+              <span
+                className="uppercase tracking-widest text-[10px]"
+                style={{ color: liveTextColor }}
+              >
                 live
               </span>
             </span>
