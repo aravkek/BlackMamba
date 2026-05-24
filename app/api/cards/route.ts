@@ -82,10 +82,19 @@ export async function POST(req: Request): Promise<NextResponse> {
       type: "virtual",
       status: "active",
       spending_controls: {
+        // ALL_TIME cap — merchant gets exactly ONE charge up to the
+        // subscription's price. After that, every future charge declines.
+        // The merchant's billing system fails on the next cycle and the
+        // sub auto-cancels on their side. This is the actual moat: we
+        // don't politely ask to cancel, we revoke at the payment layer.
+        //
+        // v1 roadmap: agent extracts the trial price from the cancel page
+        // during the cancel flow and passes it here instead of using the
+        // dashboard-seeded amount.
         spending_limits: [
           {
             amount: Math.round(limit * 100), // cents
-            interval: "monthly",
+            interval: "all_time",
           },
         ],
       },
