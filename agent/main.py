@@ -76,16 +76,15 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    has_openai = bool(os.getenv("OPENAI_API_KEY"))
-    has_anthropic = bool(os.getenv("ANTHROPIC_API_KEY"))
-    has_google = bool(os.getenv("GOOGLE_API_KEY"))
-
-    provider = None
-    if has_openai:
+    provider: Optional[str] = None
+    # Match the priority in cancel._pick_llm()
+    if os.getenv("BACKBOARD_API_KEY"):
+        provider = "backboard"
+    elif os.getenv("OPENAI_API_KEY"):
         provider = "openai"
-    elif has_anthropic:
+    elif os.getenv("ANTHROPIC_API_KEY"):
         provider = "anthropic"
-    elif has_google:
+    elif os.getenv("GOOGLE_API_KEY"):
         provider = "google"
 
     return HealthResponse(

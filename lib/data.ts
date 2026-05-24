@@ -53,6 +53,15 @@ export const SUBSCRIPTIONS: Subscription[] = [
     brandColor: "#ED1C24",
     note: "All-club · monthly",
   },
+  {
+    id: "nytimes",
+    service: "NYTimes",
+    amount: 17.0,
+    frequency: "monthly",
+    brandColor: "#FFFFFF",
+    accentText: "#cccccc",
+    note: "All Access · notoriously hostile to cancel",
+  },
 ];
 
 /** annual at-stake total computed once */

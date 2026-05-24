@@ -44,7 +44,30 @@ class CancelResult(BaseModel):
 
 
 def _pick_llm():
-    """Return a (provider_name, langchain LLM) tuple based on available keys."""
+    """Return a (provider_name, langchain LLM) tuple based on available keys.
+
+    Priority:
+    1. Backboard (sponsor, OpenAI-compatible) — set BACKBOARD_API_KEY
+    2. OpenAI direct
+    3. Anthropic
+    4. Google
+    """
+    # Backboard: OpenAI-compatible endpoint, so route the OpenAI client there.
+    if os.getenv("BACKBOARD_API_KEY"):
+        from langchain_openai import ChatOpenAI
+
+        base = os.getenv("BACKBOARD_BASE_URL", "https://api.backboard.io/v1")
+        # Backboard exposes /v1/chat/completions, langchain_openai appends /chat/completions
+        # so base_url must end at /v1.
+        if not base.rstrip("/").endswith("/v1"):
+            base = base.rstrip("/") + "/v1"
+        model = os.getenv("BACKBOARD_MODEL", "gpt-4o-mini")
+        return "backboard", ChatOpenAI(
+            model=model,
+            temperature=0.0,
+            api_key=os.environ["BACKBOARD_API_KEY"],
+            base_url=base,
+        )
     if os.getenv("OPENAI_API_KEY"):
         from langchain_openai import ChatOpenAI
 
@@ -62,7 +85,7 @@ def _pick_llm():
             model="gemini-2.0-flash-exp", temperature=0.0
         )
     raise RuntimeError(
-        "no_llm_key: set one of OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY"
+        "no_llm_key: set one of BACKBOARD_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY"
     )
 
 
