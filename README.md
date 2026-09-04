@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BlackMamba
 
-## Getting Started
+**Cancels your subscription, then kills the card so it can never charge you again.**
 
-First, run the development server:
+Built in one day at the TechTO Hackathon, Toronto, May 24 2026.
+Team: Arav Kekane, Aarya Prakash, Zain.
+
+## What it does
+
+Type "cancel Toronto Star." A browser agent opens a real Chrome session, walks the merchant's retention flow, clicks through every "are you sure," and confirms the cancellation. Verified live at the hackathon: Toronto Star cancelled in 201 seconds across 16 autonomous agent actions.
+
+The moment cancel confirms, BlackMamba calls Stripe Issuing and mints a virtual card capped at the exact subscription price with an all-time spend limit. If the merchant ever re-bills, the card allows exactly one charge and then declines forever.
+
+The idea: retention bots get smarter every quarter and you can't out-click them indefinitely. The durable fix is to revoke at the payment layer.
+
+## How it's built
+
+- `app/`, `components/`, `lib/` — Next.js front end (subscription list, cancel command, card status)
+- `agent/` — Python agent service on `:8001`. Claude Sonnet via browser-use drives a dedicated Chrome profile through the cancel flow; `cancel.py` is the job, `jobs.py` the queue, `main.py` the API
+- Stripe Issuing (test mode) for the single-charge virtual cards
+- ElevenLabs for the voice path
+
+See `docs/` for the design notes and plans written during the day, kept as-is.
+
+## Running it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install && pnpm dev          # front end on :3000
+cd agent && pip install -r requirements.txt && python main.py   # agent on :8001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Copy `.env.example` and `agent/.env.example` and fill in your own keys. Nothing in this repo runs against live money.
